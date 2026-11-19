@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <base href="/">
+  <title>broken data check</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="hud" class="hud" hidden>
+    <span id="hud-uptime"></span><div id="hud-uptime-bar"></div><div id="hud-telemetry-bar"></div><span id="hud-level"></span>
+    <div id="hud-difficulty"></div><div id="hud-level-time"></div><div id="hud-time"></div><div id="hud-test"></div><ul id="hud-loadout"></ul>
+  </div>
+  <div id="banner" class="banner" hidden></div>
+  <div id="overlay" class="overlay"></div>
+  <div id="live" class="visually-hidden" aria-live="polite"></div>
+  <script type="module">
+    // Serve a deliberately broken copy of data/game.json: duplicate enemy id + missing field.
+    const realFetch = window.fetch.bind(window);
+    window.fetch = async (url, opts) => {
+      if (String(url).endsWith('data/game.json')) {
+        const data = await (await realFetch(url, opts)).json();
+        data.enemies[1].id = data.enemies[0].id;
+        delete data.tools[0].ranks[0].damage;
+        return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
+      }
+      return realFetch(url, opts);
+    };
+    await import('/main.js');
+  </script>
+</body>
+</html>

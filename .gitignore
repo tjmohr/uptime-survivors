@@ -1,0 +1,32 @@
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code: personal, machine-local settings and session state (shared skills in .claude/ are committed)
+.claude/settings.local.json
+**/.claude/*.local.md
+
+# Python bytecode (from the Spec Kit helper scripts)
+__pycache__/
+*.pyc
+
+# Node (only used for the optional terminal test runner)
+node_modules/
+npm-debug.log*
+
+# Logs and temporary files
+*.log
+*.tmp
+tmp/
+
+# Local secrets (the game needs none; guard against accidents)
+.env
+.env.*

@@ -1,0 +1,49 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>smoke2</title></head>
+<body>
+<iframe id="f" width="1280" height="800"></iframe>
+<script type="module">
+const results = {};
+const frame = document.getElementById('f');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const W = () => frame.contentWindow;
+const G = () => W().__uptimeSurvivors;
+const doc = () => frame.contentDocument;
+const key = (type, code) => W().dispatchEvent(new (W().KeyboardEvent)(type, { code, bubbles: true }));
+async function until(fn, ms = 20000, label = '') {
+  const t0 = performance.now();
+  while (performance.now() - t0 < ms) { try { if (fn()) return true; } catch {} await sleep(50); }
+  throw new Error('timeout: ' + label);
+}
+try {
+  // M9: broken data shows the error screen and no Start button
+  frame.src = '/tests/browser/broken.html';
+  await until(() => doc()?.querySelector('#overlay h2'), 10000, 'error screen');
+  const h2 = doc().querySelector('#overlay h2').textContent;
+  const errs = [...doc().querySelectorAll('#overlay .errors li')].map((li) => li.textContent);
+  const hasStart = [...doc().querySelectorAll('#overlay button')].some((b) => b.textContent === 'Start');
+  results.M9 = { pass: h2 === 'Game data has errors' && !hasStart && errs.some((e) => e.includes('enemies[1].id')) && errs.some((e) => e.includes('tools[0].ranks[0].damage')),
+    note: `heading "${h2}", Start button present: ${hasStart}; errors: ${errs.join(' | ')}` };
+
+  // M7: short fast run (levelSeconds=0.5 → 10 s) to the win screen, choosing upgrade 1 at each level-up
+  frame.src = '/index.html?seed=12345&levelSeconds=0.5';
+  await until(() => doc()?.querySelector('#overlay button'), 10000, 'title');
+  doc().querySelector('#overlay button').click();
+  const banners = new Set();
+  await until(() => G().run, 3000);
+  while (G().run.phase !== 'ended') {
+    const b = doc().getElementById('banner');
+    if (!b.hidden) banners.add(b.textContent);
+    if (G().run.phase === 'levelup') { key('keydown', 'Digit1'); key('keyup', 'Digit1'); }
+    await sleep(100);
+  }
+  const t = doc().querySelector('#overlay').innerText;
+  results.M7 = { pass: G().run.outcome === 'win' && t.includes('UPTIME PRESERVED'),
+    note: `outcome ${G().run.outcome} at ${G().run.elapsed.toFixed(2)} s (run length ${G().run.runLength} s); banners seen: ${[...banners].join(' | ')}` };
+  results.hud = doc().getElementById('hud-test').textContent;
+} catch (err) {
+  results.error = String(err && err.stack || err);
+}
+fetch('/__result?d=' + encodeURIComponent(JSON.stringify(results))).catch(() => {});
+</script>
+</body></html>

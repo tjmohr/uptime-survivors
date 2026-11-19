@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Uptime Survivors</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game" aria-label="Uptime Survivors play field"></canvas>
+
+  <div id="hud" class="hud" hidden>
+    <div class="hud-row hud-top">
+      <div class="meter">
+        <span class="meter-label">UPTIME</span>
+        <div class="bar"><div id="hud-uptime-bar" class="bar-fill bar-uptime"></div></div>
+        <span id="hud-uptime" class="meter-value">100%</span>
+      </div>
+      <div class="hud-center">
+        <div id="hud-difficulty">Difficulty 1 / 20</div>
+        <div id="hud-level-time" class="hud-dim">60s left</div>
+      </div>
+      <div class="hud-right">
+        <div id="hud-time">00:00</div>
+        <div id="hud-test" class="hud-test" hidden></div>
+      </div>
+    </div>
+    <div class="hud-row">
+      <div class="meter meter-wide">
+        <span id="hud-level" class="meter-label">LVL 1</span>
+        <div class="bar"><div id="hud-telemetry-bar" class="bar-fill bar-telemetry"></div></div>
+      </div>
+    </div>
+    <ul id="hud-loadout" class="loadout" aria-label="Owned tools and passives"></ul>
+  </div>
+
+  <div id="banner" class="banner" hidden></div>
+  <div id="overlay" class="overlay"></div>
+  <div id="live" class="visually-hidden" aria-live="polite"></div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

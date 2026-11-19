@@ -1,0 +1,145 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>smoke</title></head>
+<body>
+<pre id="out">running</pre>
+<iframe id="f" width="1280" height="800"></iframe>
+<script type="module">
+import { createRun, step } from '/engine/run.js';
+const out = document.getElementById('out');
+const results = {};
+const frame = document.getElementById('f');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const W = () => frame.contentWindow;
+const G = () => W().__uptimeSurvivors;
+const doc = () => frame.contentDocument;
+const key = (type, code) => W().dispatchEvent(new (W().KeyboardEvent)(type, { code, bubbles: true }));
+async function until(fn, ms = 20000, label = '') {
+  const t0 = performance.now();
+  while (performance.now() - t0 < ms) { try { if (fn()) return true; } catch {} await sleep(50); }
+  throw new Error('timeout: ' + label);
+}
+async function load(url) {
+  frame.src = url;
+  await until(() => doc() && doc().querySelector('#overlay button'), 10000, 'title button');
+}
+const snap = (run) => run.enemies.slice(0, 5).map((e) => `${e.typeId}@${e.x.toFixed(3)},${e.y.toFixed(3)}`).join(' ');
+function record(id, pass, note) { results[id] = { pass, note }; }
+
+try {
+  // M2: title then Start = 1 input
+  await load('/index.html?seed=12345&levelSeconds=2');
+  const title = doc().querySelector('#overlay h1')?.textContent;
+  const focused = doc().activeElement?.textContent;
+  doc().querySelector('#overlay button').click();
+  await until(() => G().run && G().run.phase === 'playing', 3000, 'run start');
+  record('M2', title === 'UPTIME SURVIVORS' && focused === 'Start', `title="${title}", focused button="${focused}", run started after 1 input (Start)`);
+
+  // M8 prep: pause after ~1.5 s with no input and compare every enemy with an independent replay of the seed.
+  const openingMatches = async () => {
+    await until(() => G().run.tick >= 240, 8000, 'tick 240');
+    key('keydown', 'Escape'); key('keyup', 'Escape');
+    await until(() => G().run.phase === 'paused', 2000, 'pause for snapshot');
+    const live = G().run;
+    const replica = createRun(G().data, { seed: live.seed, levelSeconds: live.testOverrides.levelSeconds });
+    for (let i = 0; i < live.tick; i++) step(replica, { dx: 0, dy: 0 });
+    const a = live.enemies.map((e) => `${e.typeId}@${e.x},${e.y}`).join(' ');
+    const b = replica.enemies.map((e) => `${e.typeId}@${e.x},${e.y}`).join(' ');
+    key('keydown', 'Escape'); key('keyup', 'Escape');
+    await until(() => G().run.phase === 'playing', 2000, 'resume after snapshot');
+    return { seed: live.seed, tick: live.tick, count: live.enemies.length, same: a === b && live.enemies.length > 0 };
+  };
+  const opening1 = await openingMatches();
+
+  // M3: movement
+  let x0 = G().run.engineer.x, y0 = G().run.engineer.y, t0 = G().run.tick;
+  key('keydown', 'KeyD'); await until(() => G().run.tick >= t0 + 30 || G().run.phase !== 'playing', 3000); key('keyup', 'KeyD');
+  const straight = (G().run.engineer.x - x0) / ((G().run.tick - t0) / 60);
+  x0 = G().run.engineer.x; y0 = G().run.engineer.y; t0 = G().run.tick;
+  key('keydown', 'ArrowRight'); key('keydown', 'ArrowDown');
+  await until(() => G().run.tick >= t0 + 30 || G().run.phase !== 'playing', 3000);
+  key('keyup', 'ArrowRight'); key('keyup', 'ArrowDown');
+  const diag = Math.hypot(G().run.engineer.x - x0, G().run.engineer.y - y0) / ((G().run.tick - t0) / 60);
+  record('M3', Math.abs(straight - diag) < 8 && straight > 100, `straight ≈ ${straight.toFixed(1)} u/s, diagonal ≈ ${diag.toFixed(1)} u/s (both include any level-up pause tick drift)`);
+
+  // M4 + M5: auto-fire, telemetry, level-up screen
+  await until(() => G().run.phase === 'levelup' || G().run.phase === 'ended', 20000, 'first level-up');
+  const lvlRun = G().run;
+  const atSeconds = lvlRun.elapsed;
+  const choices = [...doc().querySelectorAll('#overlay .choice')].map((b) => b.textContent);
+  record('M4', lvlRun.stats.enemiesDefeated > 0, `${lvlRun.stats.enemiesDefeated} problems resolved by auto-firing tools before the first level-up; telemetry collected`);
+  const before = JSON.stringify([lvlRun.engineer.tools, lvlRun.engineer.passives]);
+  const pick = lvlRun.offer[0];
+  key('keydown', 'Digit1'); key('keyup', 'Digit1');
+  await until(() => G().run.phase !== 'levelup' || G().run.offer?.[0] !== pick, 3000, 'choice applied');
+  const owned = [...G().run.engineer.tools, ...G().run.engineer.passives].find((x) => x.id === pick.id);
+  const distinct = new Set(lvlRun.offer?.map?.((o) => o.id) ?? []).size;
+  record('M5', choices.length === 3 && owned && owned.rank === pick.toRank && choices.every((c) => /\d/.test(c)),
+    `level-up at ${atSeconds.toFixed(1)} s of a 2 s-per-level run; ${choices.length} choices shown: ${choices.map((c) => c.slice(0, 70)).join(' | ')}; chose [1] ${pick.id} → rank ${owned && owned.rank}`);
+
+  // Pause / blur (F6)
+  G().run.phase === 'levelup' && (key('keydown', 'Digit1'), key('keyup', 'Digit1'));
+  await until(() => G().run.phase === 'playing', 3000);
+  key('keydown', 'Escape'); key('keyup', 'Escape');
+  await until(() => G().run.phase === 'paused', 2000, 'paused');
+  const pausedTick = G().run.tick;
+  await sleep(1000);
+  const stillPaused = G().run.tick === pausedTick && doc().querySelector('#overlay h2')?.textContent === 'Paused';
+  key('keydown', 'KeyP'); key('keyup', 'KeyP');
+  await until(() => G().run.phase === 'playing', 2000, 'resumed');
+  W().dispatchEvent(new (W().Event)('blur'));
+  await until(() => G().run.phase === 'paused', 2000, 'blur pause');
+  doc().querySelector('#overlay button').click(); // Resume
+  await until(() => G().run.phase === 'playing', 2000);
+  record('F6', stillPaused, `Esc paused (tick frozen at ${pausedTick} for 1 s), P resumed, window blur auto-paused, Resume button resumed`);
+
+  // M7 / M6: play out the 40-second run, choosing upgrade 1 and circling to kite.
+  let dirIndex = 0; const dirs = [['KeyD'], ['KeyD', 'KeyS'], ['KeyS'], ['KeyA', 'KeyS'], ['KeyA'], ['KeyA', 'KeyW'], ['KeyW'], ['KeyD', 'KeyW']];
+  const banners = new Set();
+  while (G().run.phase !== 'ended') {
+    const b = doc().getElementById('banner');
+    if (!b.hidden) banners.add(b.textContent);
+    if (G().run.phase === 'levelup') { key('keydown', 'Digit1'); key('keyup', 'Digit1'); }
+    for (const k of dirs[dirIndex % 8]) key('keyup', k);
+    dirIndex++;
+    for (const k of dirs[dirIndex % 8]) key('keydown', k);
+    await sleep(250);
+  }
+  for (const k of ['KeyA', 'KeyD', 'KeyW', 'KeyS']) key('keyup', k);
+  const end1 = G().run;
+  const endText = doc().querySelector('#overlay')?.innerText ?? '';
+  const statsOk = ['Time survived', 'Difficulty reached', 'Problems resolved', 'Engineer level', 'Tools & passives', 'Seed'].every((s) => endText.includes(s));
+  record(end1.outcome === 'win' ? 'M7' : 'M6', statsOk,
+    `run ended: ${end1.outcome} at ${end1.elapsed.toFixed(1)} s, difficulty ${end1.stats.highestDifficulty}/20; end screen shows all stats: ${statsOk}; banners seen: ${[...banners].join(' | ')}`);
+  results.endScreen = endText.replace(/\s+/g, ' ').slice(0, 300);
+
+  // M8: Replay Seed reproduces the opening spawns
+  [...doc().querySelectorAll('#overlay button')].find((b) => b.textContent === 'Replay Seed').click();
+  await until(() => G().run && G().run.phase === 'playing', 5000, 'replay start');
+  const opening2 = await openingMatches();
+  record('M8', opening1.seed === opening2.seed && opening1.same && opening2.same,
+    `seed ${opening1.seed} → ${opening2.seed}; original run at tick ${opening1.tick}: ${opening1.count} enemies identical to an independent replay of the seed: ${opening1.same}; Replay Seed run at tick ${opening2.tick}: ${opening2.count} enemies identical: ${opening2.same}`);
+
+  // F7: only same-origin requests
+  const urls = W().performance.getEntriesByType('resource').map((e) => e.name);
+  const foreign = urls.filter((u) => !u.startsWith(location.origin));
+  record('F7', foreign.length === 0, `${urls.length} resource requests, ${foreign.length} to other origins`);
+
+  // Loss path if not seen yet: stand still on a full-speed run
+  if (!results.M6) {
+    await load('/index.html?seed=777&levelSeconds=60');
+    doc().querySelector('#overlay button').click();
+    while (G().run?.phase !== 'ended') {
+      if (G().run?.phase === 'levelup') { key('keydown', 'Digit1'); key('keyup', 'Digit1'); }
+      await sleep(500);
+    }
+    const t = doc().querySelector('#overlay')?.innerText ?? '';
+    record('M6', G().run.outcome === 'loss' && t.includes('NETWORK DOWN') && t.includes('Seed'),
+      `standing still: ${G().run.outcome} at ${G().run.elapsed.toFixed(1)} s (difficulty ${G().run.stats.highestDifficulty}); loss screen with stats shown`);
+  }
+} catch (err) {
+  results.error = String(err && err.stack || err);
+}
+out.textContent = 'DONE ' + JSON.stringify(results, null, 1);
+fetch('/__result?d=' + encodeURIComponent(JSON.stringify(results))).catch(() => {});
+</script>
+</body></html>

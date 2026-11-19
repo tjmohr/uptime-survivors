@@ -1,0 +1,184 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>smoke3</title></head>
+<body>
+<iframe id="f" width="1280" height="800"></iframe>
+<script type="module">
+import { spawnEnemy } from '/engine/spawner.js';
+import { rowFor } from '/engine/difficulty.js';
+import { addTelemetry } from '/engine/progression.js';
+const mode = new URLSearchParams(location.search).get('mode');
+const results = { mode };
+const frame = document.getElementById('f');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const W = () => frame.contentWindow;
+const G = () => W().__uptimeSurvivors;
+const doc = () => frame.contentDocument;
+const key = (type, code) => W().dispatchEvent(new (W().KeyboardEvent)(type, { code, bubbles: true }));
+async function until(fn, ms = 20000, label = '') {
+  const t0 = performance.now();
+  while (performance.now() - t0 < ms) { try { if (fn()) return true; } catch {} await sleep(50); }
+  throw new Error('timeout: ' + label);
+}
+async function start(url) {
+  const loaded = new Promise((r) => frame.addEventListener('load', r, { once: true }));
+  frame.src = url;
+  await loaded;
+  await until(() => doc()?.querySelector('#overlay button'), 10000, 'title');
+  doc().querySelector('#overlay button').click();
+  await until(() => G().run?.phase === 'playing', 3000, 'start');
+}
+// Test-only: make the engineer effectively invincible so long checks can run to completion.
+const invincible = () => { const e = G().run.engineer; e.maxUptime = 1e12; e.uptime = 1e12; };
+
+try {
+  if (mode === 'roster') {
+    // F2 + F3: fast run through all 20 levels (1 s each), cycling level-up choices.
+    await start('/index.html?seed=4242&levelSeconds=1');
+    invincible();
+    const banners = new Set(), offered = new Set(), types = new Set();
+    let maxTools = 0, splitSeen = false, blinkSeen = false, choice = 0;
+    const lastPos = new Map();
+    while (G().run.phase !== 'ended') {
+      const run = G().run;
+      const b = doc().getElementById('banner');
+      if (!b.hidden) banners.add(b.textContent);
+      if (run.phase === 'levelup') {
+        for (const o of run.offer) offered.add(`${o.kind}:${o.id}`);
+        const i = choice++ % run.offer.length;
+        key('keydown', `Digit${i + 1}`); key('keyup', `Digit${i + 1}`);
+      }
+      maxTools = Math.max(maxTools, run.engineer.tools.length);
+      for (const e of run.enemies) {
+        types.add(e.typeId);
+        if (e.generation > 0) splitSeen = true;
+        if (e.typeId === 'route-flap') {
+          const p = lastPos.get(e.id);
+          if (p && Math.hypot(e.x - p.x, e.y - p.y) > 40) blinkSeen = true;
+          lastPos.set(e.id, { x: e.x, y: e.y });
+        }
+      }
+      await sleep(30);
+    }
+    const threat = [...banners].filter((t) => t.startsWith('New threat'));
+    // Split: a weakened storm next to the engineer is cleared by Ping and should break into copies.
+    await start('/index.html?seed=5');
+    invincible();
+    const storm = spawnEnemy(G().run, 'broadcast-storm', 60, 0, rowFor(G().run.data, 8));
+    storm.health = 1;
+    await until(() => G().run.enemies.some((e) => e.generation > 0), 5000, 'split copies').then(() => { splitSeen = true; }).catch(() => {});
+    const copies = G().run.enemies.filter((e) => e.generation > 0).length;
+    results.F2 = { pass: threat.length === 5 && splitSeen && blinkSeen && types.size === 5,
+      note: `threat banners: ${threat.join(' | ')}; enemy types seen: ${[...types].join(', ')}; split copies seen: ${splitSeen} (${copies} copies); route-flap blink seen: ${blinkSeen}; outcome ${G().run.outcome}` };
+    // F3: grant telemetry level by level and choose through the real level-up screen until only Failover remains.
+    offered.clear(); maxTools = 0; let healSeen = false; let rounds = 0;
+    G().run.engineer.tools.length = 1;
+    while (!healSeen && rounds < 80) {
+      const run = G().run;
+      if (run.phase === 'playing') addTelemetry(run, run.engineer.telemetryToNext - run.engineer.telemetry);
+      await until(() => G().run.phase === 'levelup' && doc().querySelectorAll('#overlay .choice').length, 3000, 'levelup screen');
+      const shown = doc().querySelectorAll('#overlay .choice').length;
+      if (shown !== run.offer.length) throw new Error('screen shows ' + shown + ' but offer has ' + run.offer.length);
+      for (const o of run.offer) { offered.add(`${o.kind}:${o.id}`); if (o.kind === 'heal') healSeen = true; }
+      const i = rounds++ % run.offer.length;
+      key('keydown', `Digit${i + 1}`); key('keyup', `Digit${i + 1}`);
+      await until(() => G().run.phase !== 'levelup' || G().run.offer !== run.offer, 3000, 'choice');
+      maxTools = Math.max(maxTools, G().run.engineer.tools.length);
+    }
+    results.F3 = { pass: maxTools <= 4 && healSeen && offered.size >= 7,
+      note: `${rounds} level-ups chosen via keys 1–3; offered: ${[...offered].join(', ')}; most tools owned at once: ${maxTools}; fallback Failover offered once all maxed: ${healSeen}; final loadout: ${G().run.engineer.tools.map((t) => t.id + ':' + t.rank).concat(G().run.engineer.passives.map((p) => p.id + ':' + p.rank)).join(', ')}` };
+  }
+
+  if (mode === 'perf') {
+    // F5: ~300 enemies on screen, measure frame pacing for 5 s.
+    await start('/index.html?seed=99');
+    invincible();
+    const run = G().run;
+    const row = rowFor(run.data, 20);
+    const ids = run.data.enemies.map((e) => e.id);
+    for (let i = 0; i < 300; i++) {
+      const a = (i / 300) * Math.PI * 2 * 7;
+      const r = 80 + (i % 40) * 14;
+      const e = spawnEnemy(run, ids[i % ids.length], Math.cos(a) * r, Math.sin(a) * r, row);
+      e.health = e.maxHealth = 1e9; // keep the horde on screen for the measurement
+    }
+    await sleep(500);
+    const frames = [];
+    let stepCost = [];
+    await new Promise((resolve) => {
+      let last = null;
+      const t0 = W().performance.now();
+      const tick = (t) => {
+        if (last !== null) frames.push(t - last);
+        last = t;
+        if (t - t0 < 5000) W().requestAnimationFrame(tick); else resolve();
+      };
+      W().requestAnimationFrame(tick);
+    });
+    const sorted = [...frames].sort((a, b) => a - b);
+    const avg = frames.reduce((s, x) => s + x, 0) / frames.length;
+    const p95 = sorted[Math.floor(sorted.length * 0.95)];
+    results.F5 = { pass: avg < 20 && p95 < 34 && G().run.phase === 'playing',
+      note: `phase ${G().run.phase}; ${G().run.enemies.length} enemies, ${G().run.projectiles.length} projectiles; ${frames.length} frames in 5 s; avg ${avg.toFixed(1)} ms (${(1000 / avg).toFixed(0)} fps), p95 ${p95.toFixed(1)} ms, max ${sorted[sorted.length - 1].toFixed(1)} ms; render scale ${G().render.scale}` };
+  }
+
+  if (mode === 'full') {
+    // F4: real-time full-length run (60 s levels). Test-only invincibility so the run reaches the end.
+    // Wall-clock play time is summed frame by frame, counting only frames where the game stayed in
+    // the playing phase (level-up screens pause the game and are excluded).
+    await start('/index.html?seed=2026');
+    invincible();
+    let playMs = 0, wallMs = 0, last = null, lastPhase = null, maxEnemies = 0, levelUps = 0;
+    const done = new Promise((resolve) => {
+      const tick = (t) => {
+        const phase = G().run?.phase;
+        if (last !== null) {
+          wallMs += t - last;
+          if (phase === 'playing' && lastPhase === 'playing') playMs += t - last;
+        }
+        last = t; lastPhase = phase;
+        if (phase === 'ended') resolve(); else W().requestAnimationFrame(tick);
+      };
+      W().requestAnimationFrame(tick);
+    });
+    let ended = false;
+    done.then(() => { ended = true; });
+    while (!ended) {
+      const run = G().run;
+      invincible(); // re-apply: choosing a passive recomputes max Uptime
+      maxEnemies = Math.max(maxEnemies, run.enemies.length);
+      if (run.phase === 'levelup') {
+        levelUps++;
+        key('keydown', 'Digit1'); key('keyup', 'Digit1');
+        await until(() => G().run.phase !== 'levelup' || G().run.offer !== run.offer, 3000, 'choice');
+      }
+      await sleep(50);
+    }
+    const play = playMs / 1000;
+    results.F4 = { pass: G().run.outcome === 'win' && Math.abs(G().run.elapsed - 1200) < 1e-6 && Math.abs(play - 1200) <= 5,
+      note: `outcome ${G().run.outcome}; game time ${G().run.elapsed} s; wall clock while playing ${play.toFixed(1)} s (total incl. ${levelUps} level-up screens ${(wallMs / 1000).toFixed(1)} s); engineer level ${G().run.engineer.level}; peak ${maxEnemies} enemies; end screen: ${doc().querySelector('#overlay h2')?.textContent}` };
+  }
+
+  if (mode === 'motion') {
+    // F9: compare effects with and without prefers-reduced-motion (set by the launcher flag).
+    await start('/index.html?seed=7');
+    const run = G().run;
+    run.engineer.uptime = run.engineer.maxUptime = 1e6;
+    const row = rowFor(run.data, 1);
+    for (let i = 0; i < 12; i++) spawnEnemy(run, 'dropped-packet', 40 + i * 8, (i % 2 ? 1 : -1) * 30, row);
+    spawnEnemy(run, 'dropped-packet', 0, 0, row).health = 1e9;
+    let maxParticles = 0, maxFlash = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < 4000) {
+      const s = G().render;
+      maxParticles = Math.max(maxParticles, s.particles);
+      maxFlash = Math.max(maxFlash, s.flash);
+      await sleep(16);
+    }
+    results.F9 = { reducedMotion: G().render.reducedMotion, maxParticles, maxFlash, defeated: G().run.stats.enemiesDefeated };
+  }
+} catch (err) {
+  results.error = String(err && err.stack || err);
+}
+fetch('/__result?d=' + encodeURIComponent(JSON.stringify(results))).catch(() => {});
+</script>
+</body></html>
