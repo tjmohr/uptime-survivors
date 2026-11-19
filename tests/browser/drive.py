@@ -1,4 +1,4 @@
-"""Scripted browser checks for Uptime Survivors (quickstart.md M2–M9, F2–F7, F9).
+"""Scripted browser checks for Uptime Survivors (001 quickstart.md M2–M9, F2–F7, F9; 002 quickstart.md A6, B1–B8).
 
 Runs each smoke page in a fresh headless Chrome profile against a local static server it starts
 itself. Each page reports its results by requesting /__result?d=<json>, which this script reads
@@ -8,6 +8,7 @@ usage (from the repository root):
     python3 tests/browser/drive.py                 # milestone + roster + perf + motion checks
     python3 tests/browser/drive.py --full-run      # also the real-time 20-minute run (F4)
     python3 tests/browser/drive.py --only smoke2    # just one page
+    python3 tests/browser/drive.py --only audio     # just the sound checks (B1–B8)
     python3 tests/browser/drive.py --chrome "/path/to/chrome"
 
 These checks drive the game with synthetic key presses and, for long checks, make the engineer
@@ -39,7 +40,28 @@ CHECKS = [
     ("tests/browser/smoke3.html?mode=motion", [], 60),
     ("tests/browser/smoke3.html?mode=motion", ["--force-prefers-reduced-motion"], 60),
 ]
+# Sound checks need autoplay allowed: a scripted click is not a real user gesture.
+AUTOPLAY = ["--autoplay-policy=no-user-gesture-required"]
+CHECKS += [
+    ("tests/browser/smoke-audio.html?mode=b1b2", AUTOPLAY, 60),
+    ("tests/browser/smoke-audio.html?mode=b3", AUTOPLAY, 60),
+    ("tests/browser/smoke-audio.html?mode=b4", AUTOPLAY, 60),
+    ("tests/browser/smoke-audio.html?mode=b5", AUTOPLAY, 120),
+    ("tests/browser/smoke-audio.html?mode=b6", [], 60),
+    ("tests/browser/smoke-audio.html?mode=data", [], 60),
+    ("tests/browser/smoke-audio.html?mode=b7", AUTOPLAY, 60),
+]
+AUDIO_EXTENSIONS = (".wav", ".mp3", ".ogg", ".flac", ".m4a", ".aac", ".opus", ".webm", ".aif", ".aiff", ".mid", ".midi")
 FULL_RUN = ("tests/browser/smoke3.html?mode=full", [], 1500)
+
+
+def check_no_audio_files():
+    """002 A6 / SC-007: the repository contains no audio files (all sound is synthesized)."""
+    found = []
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        dirnames[:] = [d for d in dirnames if d != ".git"]
+        found += [os.path.relpath(os.path.join(dirpath, f), ROOT) for f in filenames if f.lower().endswith(AUDIO_EXTENSIONS)]
+    return {"pass": not found, "note": "no audio files in the repository" if not found else "found: " + ", ".join(found)}
 
 
 def free_port():
@@ -87,6 +109,10 @@ def main():
                               cwd=ROOT, stdout=log, stderr=log)
     time.sleep(1)
     ok = True
+    if not args.only or "audio" in args.only:
+        a6 = check_no_audio_files()
+        ok &= a6["pass"]
+        print(f"== repository\n  {'PASS' if a6['pass'] else 'FAIL'} A6: {a6['note']}")
     try:
         checks = CHECKS + ([FULL_RUN] if args.full_run else [])
         if args.only:

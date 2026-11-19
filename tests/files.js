@@ -8,4 +8,6 @@ export const testFiles = [
   './progression.test.js',
   './behaviors.test.js',
   './determinism.test.js',
+  './audio-content.test.js',
+  './audio-director.test.js',
 ];

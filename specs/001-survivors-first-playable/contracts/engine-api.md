@@ -22,8 +22,8 @@ called by the UI.
 
 ## Events
 
-`step()` appends to `run.events` (cleared by the UI after each frame) so the UI can show feedback
-without reading internals:
+`step()` appends to `run.events` (cleared by the UI after each frame) so the UI — and, since feature 002,
+the audio director — can give feedback without reading internals. Events are not part of `hashRun`:
 
 | Event | Payload | UI use |
 |-------|---------|--------|
@@ -35,6 +35,8 @@ without reading internals:
 | `run-ended` | `{outcome}` | Open end screen |
 | `pulse` | `{x, y, radius}` | Ansible Playbook ring effect |
 | `blink` | `{x, y}` | Route Flap jump (available for effects) |
+| `fire` | `{toolId}` | Once per volley of a `projectile-nearest` or `spread` tool — firing sound (feature 002) |
+| `pickup` | `{value}` | Once per collected telemetry pickup — pickup sound (feature 002) |
 
 ## Guarantees tested
 

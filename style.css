@@ -164,3 +164,12 @@ button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* Sound (feature 002) */
+.hud-sound { color: var(--dim); font-size: 12px; margin-top: 2px; }
+.hud-sound.off { color: var(--warn); }
+.sound-controls { display: grid; grid-template-columns: auto 1fr auto; gap: 10px 12px; align-items: center; margin-top: 16px; }
+.sound-controls label { color: var(--dim); font-size: 14px; }
+.sound-controls output { min-width: 3.5em; text-align: right; font-variant-numeric: tabular-nums; }
+.sound-controls input[type=range] { width: 100%; accent-color: var(--accent); }
+.sound-controls input[type=range]:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }

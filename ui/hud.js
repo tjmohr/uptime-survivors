@@ -20,6 +20,7 @@ export function createHud(testLabel) {
     time: $('hud-time'),
     loadout: $('hud-loadout'),
     test: $('hud-test'),
+    sound: $('hud-sound'),
   };
   if (testLabel) {
     els.test.textContent = testLabel;
@@ -57,8 +58,15 @@ export function createHud(testLabel) {
     return li;
   }
 
+  // contracts/ui-controls.md › HUD sound indicator.
+  function setSound(status, muted) {
+    els.sound.textContent = status === 'unavailable' ? 'Sound unavailable' : muted ? 'Sound off (M)' : '♪ Sound on (M)';
+    els.sound.classList.toggle('off', status === 'unavailable' || muted);
+  }
+
   return {
     update,
+    setSound,
     show() { root.hidden = false; },
     hide() { root.hidden = true; },
   };

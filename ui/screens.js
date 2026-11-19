@@ -89,7 +89,7 @@ export function createScreens() {
       ...errors.map((e) => el('li', {}, `${e.id ?? '—'} · ${e.path || '(file)'}: ${e.message}`)));
     open('error', el('div', { className: 'panel error', role: 'alert' },
       el('h2', {}, 'Game data has errors'),
-      el('p', {}, 'The game cannot start until data/game.json is fixed:'),
+      el('p', {}, 'The game cannot start until data/game.json and data/audio.json are fixed:'),
       list), `Game data has ${errors.length} errors`);
   }
 
@@ -100,7 +100,8 @@ export function createScreens() {
       el('ul', { className: 'controls' },
         el('li', {}, 'Move: WASD or arrow keys — your tools fire on their own'),
         el('li', {}, 'Level-up: press 1, 2, or 3 to choose'),
-        el('li', {}, 'Pause: Esc or P')),
+        el('li', {}, 'Pause: Esc or P'),
+        el('li', {}, 'Sound: M to mute')),
       el('div', { className: 'btn-row' }, el('button', { onclick: onStart }, 'Start'))),
     'Uptime Survivors. Press Enter to start.');
   }
@@ -135,13 +136,44 @@ export function createScreens() {
       el('ul', { className: 'choices' }, ...items)), spoken);
   }
 
-  function showPause(onResume, onQuit) {
-    open('paused', el('div', { className: 'panel' },
+  // sound: {settings, available, onMute, onMusic(pct), onEffects(pct)} (002 contracts/ui-controls.md).
+  function showPause(onResume, onQuit, sound) {
+    const panel = el('div', { className: 'panel' },
       el('h2', {}, 'Paused'),
       el('p', {}, 'Nothing moves while paused. Press Esc or P to resume.'),
       el('div', { className: 'btn-row' },
         el('button', { onclick: onResume }, 'Resume'),
-        el('button', { onclick: onQuit }, 'Quit to Title'))), 'Paused');
+        el('button', { onclick: onQuit }, 'Quit to Title')));
+    if (sound) panel.append(soundControls(sound));
+    open('paused', panel, 'Paused');
+  }
+
+  function soundControls(sound) {
+    const s = sound.settings;
+    const toggle = el('button', { id: 'sound-toggle', 'aria-pressed': String(!s.muted) });
+    const label = () => {
+      toggle.textContent = sound.available() ? `Sound: ${s.muted ? 'off' : 'on'} (M)` : 'Sound unavailable';
+      toggle.setAttribute('aria-pressed', String(!s.muted));
+    };
+    toggle.addEventListener('click', () => { sound.onMute(); label(); });
+    sound.refresh = label;
+    label();
+    const slider = (id, name, key, onChange) => {
+      const input = el('input', { id, type: 'range', min: '0', max: '100', step: '10', value: String(s[key]),
+        'aria-valuetext': `${s[key]}%` });
+      const out = el('output', { for: id }, `${s[key]}%`);
+      input.addEventListener('input', () => {
+        const pct = Number(input.value);
+        out.textContent = `${pct}%`;
+        input.setAttribute('aria-valuetext', `${pct}%`);
+        onChange(pct);
+      });
+      return [el('label', { for: id }, name), input, out];
+    };
+    return el('div', { className: 'sound-controls', role: 'group', 'aria-label': 'Sound' },
+      toggle, el('span', {}), el('span', {}),
+      ...slider('music-volume', 'Music', 'musicVolume', sound.onMusic),
+      ...slider('effects-volume', 'Effects', 'effectsVolume', sound.onEffects));
   }
 
   function showEnd(run, { onNew, onReplay }) {

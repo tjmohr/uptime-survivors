@@ -327,7 +327,8 @@ scope amendment:
 - No multiplayer.
 - No runtime AI, accounts, backend, or live network/device connections.
 - No level or content editor.
-- No audio (music or sound effects).
+- No audio (music or sound effects). *Lifted by feature 002 — sound effects and music are specified in
+  [`specs/002-procedural-audio/`](../002-procedural-audio/spec.md); all other non-goals still apply.*
 - No multiple maps or hand-built stages; one open map, with difficulty driven by data.
 - No mobile/touch controls or gamepad support.
 - No quiz, question, or grading mechanics; leftover quiz material in the starter kit does not

@@ -1,0 +1,309 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>smoke-audio</title></head>
+<body>
+<iframe id="f" width="1280" height="800"></iframe>
+<script type="module">
+// Scripted audio checks B1–B8 (specs/002-procedural-audio/quickstart.md). Run by tests/browser/drive.py
+// with --autoplay-policy=no-user-gesture-required, because a scripted click is not a user gesture.
+import { spawnEnemy } from '/engine/spawner.js';
+import { rowFor } from '/engine/difficulty.js';
+import { addTelemetry } from '/engine/progression.js';
+import { addPickup } from '/engine/combat.js';
+import { layersForLevel } from '/audio/director.js';
+const mode = new URLSearchParams(location.search).get('mode');
+const results = { mode };
+const frame = document.getElementById('f');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const W = () => frame.contentWindow;
+const G = () => W().__uptimeSurvivors;
+const A = () => G().audio;
+const doc = () => frame.contentDocument;
+const key = (type, code, target) => {
+  const ev = new (W().KeyboardEvent)(type, { code, bubbles: true, cancelable: true });
+  (target || W()).dispatchEvent(ev);
+  return ev;
+};
+const press = (code, target) => { const ev = key('keydown', code, target); key('keyup', code, target); return ev; };
+const hudSound = () => doc().getElementById('hud-sound').textContent;
+async function until(fn, ms = 20000, label = '') {
+  const t0 = performance.now();
+  while (performance.now() - t0 < ms) { try { if (fn()) return true; } catch {} await sleep(20); }
+  throw new Error('timeout: ' + label);
+}
+async function load(url) {
+  const loaded = new Promise((r) => frame.addEventListener('load', r, { once: true }));
+  frame.src = url;
+  await loaded;
+  await until(() => doc()?.querySelector('#overlay button') && A(), 10000, 'title');
+}
+async function clickStart() {
+  const t0 = performance.now();
+  doc().querySelector('#overlay button').click();
+  await until(() => G().run?.phase === 'playing', 3000, 'start');
+  return t0;
+}
+const invincible = () => { const e = G().run?.engineer; if (e) { e.maxUptime = 1e12; e.uptime = 1e12; } };
+// Plays for `ms`, wandering and taking the first upgrade on each level-up screen.
+async function play(ms, onTick = () => {}) {
+  const dirs = ['KeyW', 'KeyD', 'KeyS', 'KeyA'];
+  const t0 = performance.now();
+  let i = 0;
+  while (performance.now() - t0 < ms && G().run.phase !== 'ended') {
+    invincible();
+    if (G().run.phase === 'levelup') press('Digit1');
+    if (i % 40 === 0) { key('keyup', dirs[(i / 40 + 3) % 4]); key('keydown', dirs[(i / 40) % 4]); }
+    onTick();
+    i++;
+    await sleep(25);
+  }
+  for (const d of dirs) key('keyup', d);
+}
+
+try {
+  if (mode === 'b1b2') {
+    await load('/index.html?seed=31');
+    await sleep(1000);
+    const idle = A();
+    results.B1 = { pass: idle.status === 'idle' && idle.contextState === null && !idle.musicPlaying &&
+      Object.values(idle.effectCounts).every((n) => n === 0),
+      note: `title screen: status ${idle.status}, context ${idle.contextState}, music ${idle.musicPlaying}, effects ${JSON.stringify(idle.effectCounts)}` };
+
+    const t0 = await clickStart();
+    await until(() => A().status === 'running' && A().contextState === 'running', 2000, 'audio running');
+    const startMs = performance.now() - t0;
+    await sleep(600);
+    const layersEarly = { ...A().layerCounts };
+    await play(15000);
+    // Drop telemetry on the engineer and force a level-up so pickup, levelUp and damage are heard too.
+    const e = G().run.engineer;
+    addPickup(G().run, e.x + 2, e.y, 1);
+    await until(() => A().effectCounts.pickup > 0, 3000, 'pickup sound').catch(() => {});
+    addTelemetry(G().run, e.telemetryToNext - e.telemetry);
+    await until(() => A().effectCounts.levelUp > 0, 3000, 'levelUp sound').catch(() => {});
+    press('Digit1');
+    G().run.engineer.maxUptime = 100; G().run.engineer.uptime = 100;
+    spawnEnemy(G().run, G().run.data.enemies[0].id, e.x + 5, e.y, rowFor(G().run.data, 20)).health = 1e9;
+    await until(() => A().effectCounts.damage > 0, 3000, 'damage sound').catch(() => {});
+    const s = A();
+    const need = ['fire', 'hit', 'defeat', 'newThreat', 'pickup', 'levelUp', 'damage'];
+    results.B2 = { pass: startMs <= 500 && s.musicPlaying && layersEarly.kick > 0 && layersEarly.bass > 0 &&
+      need.every((n) => s.effectCounts[n] > 0) && hudSound() === '♪ Sound on (M)',
+      note: `running ${startMs.toFixed(0)} ms after Start; music ${s.musicPlaying}, layers ${s.activeLayers.join('+')} (counts after 0.6 s ${JSON.stringify(layersEarly)}); effects ${JSON.stringify(s.effectCounts)}; HUD '${hudSound()}'` };
+
+    const entries = W().performance.getEntriesByType('resource').map((e) => e.name);
+    const foreign = entries.filter((u) => new URL(u).origin !== W().location.origin);
+    const audioFiles = entries.filter((u) => /\.(wav|mp3|ogg|flac|m4a|aac|opus|webm)(\?|$)/i.test(u));
+    results.B8 = { pass: foreign.length === 0 && audioFiles.length === 0 && entries.some((u) => u.endsWith('data/audio.json')),
+      note: `${entries.length} requests, ${foreign.length} to other origins, ${audioFiles.length} audio files (${entries.map((u) => new URL(u).pathname).join(' ')})` };
+  }
+
+  if (mode === 'data') {
+    // A1 in the browser: errors from both data files are listed together and Start is not offered.
+    frame.src = '/tests/browser/broken.html?audio=1';
+    await until(() => doc()?.querySelector('#overlay h2'), 10000, 'error screen');
+    const errs = [...doc().querySelectorAll('#overlay .errors li')].map((li) => li.textContent);
+    const hasStart = [...doc().querySelectorAll('#overlay button')].some((b) => b.textContent === 'Start');
+    results.A1browser = { pass: !hasStart && errs.some((e) => e.includes('enemies[1].id')) &&
+      errs.some((e) => e.includes('data/audio.json › effects.hit')) && errs.some((e) => e.includes('data/audio.json › music.layers[0].pattern')),
+      note: `Start offered: ${hasStart}; errors: ${errs.join(' | ')}` };
+  }
+
+  if (mode === 'b6') {
+    await load('/index.html?seed=31&audioFail=1');
+    await clickStart();
+    await until(() => A().status === 'unavailable', 2000, 'unavailable');
+    const tick0 = G().run.tick;
+    await play(2000);
+    const live = doc().getElementById('live').textContent;
+    results.B6 = { pass: A().status === 'unavailable' && G().run.tick > tick0 + 60 && hudSound() === 'Sound unavailable' &&
+      doc().querySelector('.panel.error') === null,
+      note: `status ${A().status}; ticks advanced ${G().run.tick - tick0}; HUD '${hudSound()}'; live region '${live}'; effects counted ${JSON.stringify(A().effectCounts)}` };
+  }
+
+  if (mode === 'b3') {
+    // M on the title screen, then Start → the run starts muted.
+    await load('/index.html?seed=31');
+    press('KeyM');
+    await sleep(100);
+    const titleMuted = A().muted;
+    await clickStart();
+    await until(() => A().status === 'running', 2000, 'running');
+    await sleep(300);
+    const startedMuted = A().muted && A().gains.master < 0.001 && hudSound() === 'Sound off (M)';
+    // Unmute, then mute during play and time it.
+    press('KeyM');
+    await sleep(200);
+    const before = { music: A().musicVolume, effects: A().effectsVolume };
+    const unmutedOk = !A().muted && Math.abs(A().gains.master - 0.8) < 0.01 && hudSound() === '♪ Sound on (M)';
+    const t0 = performance.now();
+    press('KeyM');
+    await until(() => A().gains.master < 0.001, 1000, 'master silent');
+    const muteMs = performance.now() - t0;
+    const mutedHud = hudSound();
+    press('KeyM');
+    await until(() => A().gains.master > 0.79, 1000, 'master back');
+    const after = { music: A().musicVolume, effects: A().effectsVolume };
+    // Window loses focus → game pauses and sound is suspended; focus back → running, music ducked.
+    W().dispatchEvent(new (W().Event)('blur'));
+    await until(() => A().status === 'suspended' && A().contextState === 'suspended', 2000, 'suspended').catch(() => {});
+    const suspended = `${A().status}/${A().contextState}/${G().run.phase}`;
+    W().dispatchEvent(new (W().Event)('focus'));
+    await until(() => A().status === 'running' && A().contextState === 'running', 2000, 'resumed').catch(() => {});
+    const kicks = A().layerCounts.kick;
+    await sleep(1200);
+    const resumed = `${A().status}/${A().contextState}/${G().run.phase}/ducked ${A().ducked}/music ${A().layerCounts.kick > kicks}`;
+    const focusOk = suspended === 'suspended/suspended/paused' && resumed === 'running/running/paused/ducked true/music true';
+    results.B3 = { pass: titleMuted && startedMuted && unmutedOk && muteMs <= 100 && mutedHud === 'Sound off (M)' &&
+      JSON.stringify(before) === JSON.stringify(after) && !A().muted && focusOk,
+      note: `M on title → muted ${titleMuted}; run started muted ${startedMuted}; unmute ok ${unmutedOk}; mute silenced master in ${muteMs.toFixed(0)} ms (HUD '${mutedHud}'); volumes before ${JSON.stringify(before)} after ${JSON.stringify(after)}; blur → ${suspended}; focus → ${resumed}` };
+  }
+
+  if (mode === 'b4') {
+    await load('/index.html?seed=31');
+    await clickStart();
+    await until(() => A().status === 'running', 2000, 'running');
+    await sleep(500);
+    const notes = [];
+    let pass = true;
+    const expect = (cond, text) => { notes.push(`${cond ? 'ok' : 'FAIL'} ${text}`); pass &&= !!cond; };
+    expect(!A().ducked && A().gains.duck > 0.99, 'not ducked while playing');
+    press('Escape');
+    await until(() => G().run.phase === 'paused' && doc().getElementById('music-volume'), 2000, 'pause screen');
+    await sleep(100);
+    expect(A().ducked && Math.abs(A().gains.duck - 0.5) < 0.01, `ducked to ${A().gains.duck.toFixed(2)} while paused`);
+    const toggle = doc().getElementById('sound-toggle');
+    const music = doc().getElementById('music-volume');
+    const effects = doc().getElementById('effects-volume');
+    expect(toggle && music && effects, 'Sound toggle and Music/Effects sliders present');
+    expect(music.min === '0' && music.max === '100' && music.step === '10' && music.value === '60' && effects.value === '80',
+      `slider ranges 0–100 step 10, values ${music.value}/${effects.value}`);
+    expect(doc().querySelector('label[for=music-volume]').textContent === 'Music' && music.nextElementSibling.textContent === '60%', 'Music label and 60% value shown');
+    // Arrow keys on a slider must reach the slider (not be swallowed as movement).
+    const arrow = key('keydown', 'ArrowLeft', music);
+    key('keyup', 'ArrowLeft', music);
+    expect(!arrow.defaultPrevented, 'ArrowLeft on the slider is left to the slider');
+    music.value = '30'; music.dispatchEvent(new (W().Event)('input', { bubbles: true }));
+    await sleep(100);
+    expect(A().musicVolume === 30 && Math.abs(A().gains.music - 0.09) < 0.005 && music.nextElementSibling.textContent === '30%',
+      `Music 30% → gain ${A().gains.music.toFixed(3)}`);
+    effects.value = '0'; effects.dispatchEvent(new (W().Event)('input', { bubbles: true }));
+    await sleep(100);
+    // While paused the effects bus carries no sound, and Chrome only advances a gain's reported value
+    // while audio flows through it, so check the scheduled target here and the real gain after resuming.
+    expect(A().effectsVolume === 0 && A().targetGains.effects === 0 && effects.nextElementSibling.textContent === '0%',
+      `Effects 0% → target gain ${A().targetGains.effects}`);
+    toggle.click();
+    await sleep(100);
+    expect(A().muted && A().gains.master < 0.001 && toggle.textContent.includes('off'), `Sound toggle mutes ('${toggle.textContent}')`);
+    toggle.click();
+    await sleep(100);
+    expect(!A().muted && toggle.textContent.includes('on'), 'Sound toggle unmutes');
+    press('Escape');
+    await until(() => G().run.phase === 'playing', 2000, 'resume');
+    await sleep(100);
+    expect(!A().ducked && A().gains.duck > 0.99, 'unducked after resume');
+    // Music keeps playing at Effects 0%.
+    const kicks = A().layerCounts.kick;
+    await sleep(1500);
+    expect(A().layerCounts.kick > kicks, 'music continues with Effects at 0%');
+    const total = () => Object.values(A().effectCounts).reduce((x, y) => x + y, 0);
+    const played = total();
+    await until(() => total() > played, 8000, 'an effect after resume').catch(() => {});
+    await sleep(100);
+    expect(total() > played && A().gains.effects < 0.001 && A().gains.music > 0.08,
+      `during play, effects bus gain ${A().gains.effects.toFixed(4)} (silent) while music gain ${A().gains.music.toFixed(3)}`);
+    // Level-up screen ducks too.
+    addTelemetry(G().run, G().run.engineer.telemetryToNext - G().run.engineer.telemetry);
+    await until(() => G().run.phase === 'levelup', 2000, 'levelup');
+    await sleep(150);
+    expect(A().ducked && Math.abs(A().gains.duck - 0.5) < 0.01, 'ducked on the level-up screen');
+    press('Digit1');
+    await until(() => G().run.phase === 'playing', 2000, 'after levelup');
+    await sleep(150);
+    expect(!A().ducked, 'unducked after choosing');
+    // Settings last for the page session: quit to title and start again.
+    press('Escape');
+    await until(() => doc().querySelectorAll('#overlay button').length >= 2, 2000, 'pause again');
+    [...doc().querySelectorAll('#overlay button')].find((b) => b.textContent === 'Quit to Title').click();
+    await until(() => doc().querySelector('#overlay h1'), 2000, 'title');
+    expect(!A().musicPlaying, 'music stops on Quit to Title');
+    await clickStart();
+    await sleep(300);
+    expect(A().musicVolume === 30 && A().effectsVolume === 0 && A().musicPlaying && A().level === 1,
+      `new run keeps settings (music ${A().musicVolume}, effects ${A().effectsVolume}) and restarts music at level ${A().level}`);
+    results.B4 = { pass, note: notes.join('; ') };
+  }
+
+  if (mode === 'b5') {
+    await load('/index.html?seed=12345&levelSeconds=2');
+    await clickStart();
+    await until(() => A().status === 'running', 2000, 'running');
+    const data = JSON.parse(await (await fetch('/data/audio.json')).text());
+    const samples = [];
+    let ok = true;
+    await play(60000, () => {
+      const s = A();
+      if (!s.musicPlaying) return;
+      samples.push({ level: s.level, bpm: s.bpm, layers: s.activeLayers.length });
+      if (s.activeLayers.length !== layersForLevel(data, s.level).length) ok = false;
+    });
+    await until(() => G().run.phase === 'ended', 10000, 'run end');
+    await sleep(300);
+    const s = A();
+    let nonDecreasing = true;
+    for (let i = 1; i < samples.length; i++) {
+      if (samples[i].bpm < samples[i - 1].bpm || samples[i].layers < samples[i - 1].layers) nonDecreasing = false;
+    }
+    const first = samples[0];
+    const last = samples[samples.length - 1];
+    const levels = [...new Set(samples.map((x) => x.level))];
+    const layerGrowth = [...new Set(samples.map((x) => `${x.level}:${x.layers}`))].filter((x, i, arr) => i === 0 || arr[i - 1].split(':')[1] !== x.split(':')[1]);
+    const allLayersPlayed = Object.values(s.layerCounts).every((n) => n > 0);
+    const endSounds = s.effectCounts.win + s.effectCounts.loss;
+    results.B5 = { pass: ok && nonDecreasing && last.bpm >= 1.3 * first.bpm && allLayersPlayed && !s.musicPlaying &&
+      endSounds === 1 && s.effectCounts[G().run.outcome] === 1,
+      note: `music levels heard ${levels.join(',')}; bpm ${first.bpm} → ${last.bpm.toFixed(1)} (×${(last.bpm / first.bpm).toFixed(2)}); layer count changes ${layerGrowth.join(' ')}; layers match level: ${ok}; layer hits ${JSON.stringify(s.layerCounts)}; outcome ${G().run.outcome}, end sounds ${endSounds}, music playing after end ${s.musicPlaying}` };
+  }
+
+  if (mode === 'b7') {
+    // F5 again with sound on: ~300 enemies on screen, frame pacing over 5 s.
+    await load('/index.html?seed=99');
+    await clickStart();
+    await until(() => A().status === 'running', 2000, 'running');
+    invincible();
+    const run = G().run;
+    const row = rowFor(run.data, 20);
+    const ids = run.data.enemies.map((e) => e.id);
+    for (let i = 0; i < 300; i++) {
+      const a = (i / 300) * Math.PI * 2 * 7;
+      const r = 80 + (i % 40) * 14;
+      const e = spawnEnemy(run, ids[i % ids.length], Math.cos(a) * r, Math.sin(a) * r, row);
+      e.health = e.maxHealth = 1e9;
+    }
+    await sleep(500);
+    const counts0 = { ...A().effectCounts };
+    const frames = [];
+    await new Promise((resolve) => {
+      let last = null;
+      const t0 = W().performance.now();
+      const tick = (t) => {
+        invincible();
+        if (last !== null) frames.push(t - last);
+        last = t;
+        if (t - t0 < 5000) W().requestAnimationFrame(tick); else resolve();
+      };
+      W().requestAnimationFrame(tick);
+    });
+    const sorted = [...frames].sort((a, b) => a - b);
+    const avg = frames.reduce((s, x) => s + x, 0) / frames.length;
+    const p95 = sorted[Math.floor(sorted.length * 0.95)];
+    const hits = A().effectCounts.hit - counts0.hit;
+    results.B7 = { pass: avg < 20 && p95 < 34 && G().run.phase === 'playing' && A().status === 'running' && !A().muted && hits > 0,
+      note: `${G().run.enemies.length} enemies; ${frames.length} frames in 5 s; avg ${avg.toFixed(1)} ms (${(1000 / avg).toFixed(0)} fps), p95 ${p95.toFixed(1)} ms; hit sounds in 5 s: ${hits} (limited from ${G().run.stats ? 'hundreds of' : '?'} hit events); music ${A().musicPlaying}` };
+  }
+} catch (err) {
+  results.error = String(err && err.stack || err);
+}
+fetch('/__result?d=' + encodeURIComponent(JSON.stringify(results))).catch(() => {});
+</script>
+</body></html>

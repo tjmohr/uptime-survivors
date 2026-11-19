@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "defaults": { "musicVolume": 60, "effectsVolume": 80, "muted": false },
+  "mix": { "masterGain": 0.8, "duckFactor": 0.5, "maxConcurrentEffects": 8 },
+  "effects": {
+    "fire": {
+      "minIntervalMs": 60,
+      "voice": { "wave": "square", "gain": 0.07, "attackMs": 1,
+                 "filter": { "type": "lowpass", "hz": 3200 },
+                 "notes": [ { "freq": 1320, "toFreq": 880, "ms": 45 } ] }
+    },
+    "pulse": {
+      "minIntervalMs": 100,
+      "voice": { "wave": "sine", "gain": 0.22, "attackMs": 20,
+                 "notes": [ { "freq": 160, "toFreq": 420, "ms": 240 } ] }
+    },
+    "damage": {
+      "minIntervalMs": 150,
+      "voice": { "wave": "sawtooth", "gain": 0.2, "attackMs": 2,
+                 "filter": { "type": "lowpass", "hz": 900 },
+                 "notes": [ { "freq": 140, "toFreq": 70, "ms": 170 } ] }
+    },
+    "hit": {
+      "minIntervalMs": 60,
+      "voice": { "wave": "noise", "gain": 0.09, "attackMs": 0,
+                 "filter": { "type": "bandpass", "hz": 2600 },
+                 "notes": [ { "freq": 2600, "ms": 30 } ] }
+    },
+    "defeat": {
+      "minIntervalMs": 60,
+      "voice": { "wave": "triangle", "gain": 0.16, "attackMs": 1,
+                 "notes": [ { "freq": 660, "toFreq": 165, "ms": 120 } ] }
+    },
+    "pickup": {
+      "minIntervalMs": 60,
+      "voice": { "wave": "sine", "gain": 0.1, "attackMs": 1,
+                 "notes": [ { "freq": 880, "toFreq": 1760, "ms": 60 } ] }
+    },
+    "levelUp": {
+      "minIntervalMs": 0,
+      "voice": { "wave": "square", "gain": 0.09, "attackMs": 3,
+                 "filter": { "type": "lowpass", "hz": 2800 },
+                 "notes": [ { "freq": 523.25, "ms": 90 }, { "freq": 659.25, "ms": 90 },
+                            { "freq": 783.99, "ms": 90 }, { "freq": 1046.5, "ms": 160 } ] }
+    },
+    "newThreat": {
+      "minIntervalMs": 0,
+      "voice": { "wave": "sawtooth", "gain": 0.12, "attackMs": 5,
+                 "filter": { "type": "lowpass", "hz": 1800 },
+                 "notes": [ { "freq": 440, "ms": 150 }, { "freq": 330, "ms": 150 },
+                            { "freq": 440, "ms": 150 }, { "freq": 330, "ms": 150 } ] }
+    },
+    "win": {
+      "minIntervalMs": 0,
+      "voice": { "wave": "triangle", "gain": 0.22, "attackMs": 5,
+                 "notes": [ { "freq": 523.25, "ms": 200 }, { "freq": 659.25, "ms": 200 },
+                            { "freq": 783.99, "ms": 200 }, { "freq": 1046.5, "ms": 800 } ] }
+    },
+    "loss": {
+      "minIntervalMs": 0,
+      "voice": { "wave": "sawtooth", "gain": 0.18, "attackMs": 5,
+                 "filter": { "type": "lowpass", "hz": 1100 },
+                 "notes": [ { "freq": 392, "toFreq": 196, "ms": 500 },
+                            { "freq": 185, "toFreq": 82.41, "ms": 1000 } ] }
+    }
+  },
+  "music": {
+    "bpmStart": 118,
+    "bpmEnd": 156,
+    "stepsPerBar": 16,
+    "layers": [
+      { "id": "kick", "joinLevel": 1,
+        "pattern": "x...x...x...x...",
+        "voice": { "wave": "sine", "gain": 0.55, "attackMs": 1,
+                   "notes": [ { "freq": 150, "toFreq": 45, "ms": 130 } ] } },
+      { "id": "bass", "joinLevel": 1,
+        "pattern": "..x...x...x...x.",
+        "pitches": [55, 55, 65.41, 49],
+        "voice": { "wave": "sawtooth", "gain": 0.2, "attackMs": 2,
+                   "filter": { "type": "lowpass", "hz": 420 },
+                   "notes": [ { "freq": 55, "ms": 110 } ] } },
+      { "id": "closed-hat", "joinLevel": 4,
+        "pattern": "x.x.x.x.x.x.x.x.",
+        "voice": { "wave": "noise", "gain": 0.05, "attackMs": 0,
+                   "filter": { "type": "highpass", "hz": 8000 },
+                   "notes": [ { "freq": 8000, "ms": 25 } ] } },
+      { "id": "clap", "joinLevel": 8,
+        "pattern": "....x.......x...",
+        "voice": { "wave": "noise", "gain": 0.14, "attackMs": 1,
+                   "filter": { "type": "bandpass", "hz": 1500 },
+                   "notes": [ { "freq": 1500, "ms": 80 } ] } },
+      { "id": "open-hat", "joinLevel": 12,
+        "pattern": "..x...x...x...x.",
+        "voice": { "wave": "noise", "gain": 0.045, "attackMs": 0,
+                   "filter": { "type": "highpass", "hz": 6000 },
+                   "notes": [ { "freq": 6000, "ms": 140 } ] } },
+      { "id": "percussion", "joinLevel": 12,
+        "pattern": "...x..x....x..x.",
+        "voice": { "wave": "triangle", "gain": 0.09, "attackMs": 1,
+                   "notes": [ { "freq": 330, "toFreq": 220, "ms": 50 } ] } },
+      { "id": "stab", "joinLevel": 16,
+        "pattern": "x......x...x....",
+        "pitches": [220, 261.63, 196],
+        "voice": { "wave": "square", "gain": 0.05, "attackMs": 2,
+                   "filter": { "type": "lowpass", "hz": 1200 },
+                   "notes": [ { "freq": 220, "ms": 150 } ] } }
+    ]
+  }
+}

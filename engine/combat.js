@@ -98,8 +98,10 @@ export function updatePickups(run, dt) {
       p.x += (dx / d) * stepLen;
       p.y += (dy / d) * stepLen;
     }
-    if (Math.hypot(e.x - p.x, e.y - p.y) <= PICKUP_COLLECT_DISTANCE) addTelemetry(run, p.value);
-    else kept.push(p);
+    if (Math.hypot(e.x - p.x, e.y - p.y) <= PICKUP_COLLECT_DISTANCE) {
+      addTelemetry(run, p.value);
+      run.events.push({ type: 'pickup', value: p.value });
+    } else kept.push(p);
   }
   run.pickups = kept;
 }

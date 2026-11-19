@@ -1,11 +1,12 @@
 // Testing-only URL parameters (research.md R7, contracts/ui-controls.md):
 //   ?seed=<positive integer>   fixed seed
 //   ?levelSeconds=<number > 0> every difficulty level lasts this long
+//   ?audioFail=1               make sound start fail (checks the "Sound unavailable" path)
 // Invalid values are ignored and reported so the HUD can say so.
 
 export function readParams(search) {
   const q = new URLSearchParams(search);
-  const result = { seed: null, levelSeconds: null, ignored: [] };
+  const result = { seed: null, levelSeconds: null, audioFail: q.get('audioFail') === '1', ignored: [] };
 
   if (q.has('seed')) {
     const v = Number(q.get('seed'));
@@ -24,6 +25,7 @@ export function describeParams(p) {
   const active = [];
   if (p.seed !== null) active.push(`seed=${p.seed}`);
   if (p.levelSeconds !== null) active.push(`levelSeconds=${p.levelSeconds}`);
+  if (p.audioFail) active.push('audioFail=1');
   const parts = [];
   if (active.length) parts.push(`TEST SETTING: ${active.join(' ')}`);
   if (p.ignored.length) parts.push(`ignored test setting: ${p.ignored.join(', ')}`);

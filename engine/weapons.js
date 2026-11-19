@@ -92,12 +92,14 @@ function updateTool(run, tool, dt) {
       return;
     }
     fireProjectile(run, tool.id, Math.atan2(target.y - e.y, target.x - e.x), stats, stats.pierce);
+    run.events.push({ type: 'fire', toolId: tool.id });
   } else if (def.kind === 'spread') {
     const target = nearestEnemy(run, stats.range);
     const start = target ? Math.atan2(target.y - e.y, target.x - e.x) : e.facing;
     for (let i = 0; i < stats.projectiles; i++) {
       fireProjectile(run, tool.id, start + (i * Math.PI * 2) / stats.projectiles, stats, 1);
     }
+    run.events.push({ type: 'fire', toolId: tool.id }); // once per volley, not per projectile
   } else if (def.kind === 'pulse') {
     for (const enemy of enemiesNear(run, e.x, e.y, stats.radius)) {
       if (enemy.dead) continue;

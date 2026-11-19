@@ -16,17 +16,21 @@ export function moveFromKeys(held) {
   };
 }
 
-export function createInput({ onPauseKey, onChoiceKey, onFocusLost }) {
+export function createInput({ onPauseKey, onChoiceKey, onFocusLost, onMuteKey = () => {}, onFocusGained = () => {} }) {
   const held = new Set();
 
   addEventListener('keydown', (ev) => {
-    if (MOVE_KEYS.has(ev.code)) {
+    // Arrow keys on a slider (pause-screen volume) belong to the slider, not to movement.
+    const onSlider = ev.target && ev.target.tagName === 'INPUT';
+    if (MOVE_KEYS.has(ev.code) && !onSlider) {
       held.add(ev.code);
       if (ev.code.startsWith('Arrow')) ev.preventDefault();
       return;
     }
     if (ev.repeat) return;
-    if (ev.code === 'Escape' || ev.code === 'KeyP') {
+    if (ev.code === 'KeyM') {
+      onMuteKey();
+    } else if (ev.code === 'Escape' || ev.code === 'KeyP') {
       ev.preventDefault();
       onPauseKey();
     } else if (['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].includes(ev.code)) {
@@ -40,8 +44,10 @@ export function createInput({ onPauseKey, onChoiceKey, onFocusLost }) {
     onFocusLost();
   };
   addEventListener('blur', lose);
+  addEventListener('focus', onFocusGained);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) lose();
+    else if (document.hasFocus()) onFocusGained();
   });
 
   return {
