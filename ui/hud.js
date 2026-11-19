@@ -21,6 +21,7 @@ export function createHud(testLabel) {
     loadout: $('hud-loadout'),
     test: $('hud-test'),
     sound: $('hud-sound'),
+    touchSound: $('touch-sound'),
   };
   if (testLabel) {
     els.test.textContent = testLabel;
@@ -62,6 +63,11 @@ export function createHud(testLabel) {
   function setSound(status, muted) {
     els.sound.textContent = status === 'unavailable' ? 'Sound unavailable' : muted ? 'Sound off (M)' : '♪ Sound on (M)';
     els.sound.classList.toggle('off', status === 'unavailable' || muted);
+    // Touch Sound button (003): ♪ on, ♪̸ off or unavailable; aria-pressed = sound on.
+    const on = status !== 'unavailable' && !muted;
+    els.touchSound.textContent = on ? '♪' : '♪\u0338';
+    els.touchSound.setAttribute('aria-pressed', String(on));
+    els.touchSound.setAttribute('aria-label', status === 'unavailable' ? 'Sound unavailable' : 'Sound');
   }
 
   return {

@@ -10,7 +10,7 @@ or `Math.random`** (C5, C6). The UI calls it; it never calls the UI. Tests impor
 | `engine/content.js` | `validateGameData(raw) → {ok, data} \| {ok:false, errors}` | Pure. See [game-data.md](./game-data.md). Never throws on bad input. |
 | `engine/rng.js` | `createRng(seed) → {next(), int(n), pick(list), state()}` | `next()` returns a float in [0, 1). Same seed → same sequence. |
 | `engine/run.js` | `createRun(data, {seed, levelSeconds?}) → RunState` | New run in `playing` phase with the starting tool, Uptime full. |
-| `engine/run.js` | `step(run, input) → void` | Advances exactly one 1/60 s step when `run.phase === "playing"`; does nothing otherwise. `input = {dx, dy}`, each −1, 0, or 1. |
+| `engine/run.js` | `step(run, input) → void` | Advances exactly one 1/60 s step when `run.phase === "playing"`; does nothing otherwise. `input = {dx, dy}`: any finite numbers, each clamped to [−1, 1] (anything else counts as 0); the direction is normalised, so movement is always full speed at any angle. Keyboard input uses −1, 0, or 1, as before (any-angle input added by feature 003). |
 | `engine/run.js` | `chooseUpgrade(run, index) → {ok, reason?}` | Valid only in `levelup` phase with an index in the current offer; otherwise returns `{ok:false}` and changes nothing. |
 | `engine/run.js` | `pause(run)`, `resume(run)` | Switch between `playing` and `paused`; ignored in other phases. |
 | `engine/progression.js` | `telemetryToNext(data, level)`, `buildOffer(run) → OfferItem[]`, `describeChange(data, item) → {stat, from, to}[]` | Offer and its numbers come from the rank tables (FR-015). |

@@ -10,14 +10,16 @@ const PICKUP_COLLECT_DISTANCE = ENGINEER_RADIUS + 4;
 const MAX_ENEMY_RADIUS = 40;
 const touching = [];
 
-const clampAxis = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
+// Any finite number, clamped to [-1, 1]; anything else (NaN, Infinity, non-numbers) counts as 0.
+// Keyboard input is only -1/0/1, which passes through unchanged; touch gives any angle (feature 003).
+const clampAxis = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-1, Math.min(1, v)) : 0);
 
 export function moveEngineer(run, input, dt) {
   const e = run.engineer;
   const dx = clampAxis(input?.dx ?? 0);
   const dy = clampAxis(input?.dy ?? 0);
   if (dx === 0 && dy === 0) return;
-  const len = Math.hypot(dx, dy); // diagonals are normalised: never faster than straight
+  const len = Math.hypot(dx, dy); // direction only: always full speed, never faster on diagonals
   e.x += (dx / len) * e.moveSpeed * dt;
   e.y += (dy / len) * e.moveSpeed * dt;
   e.facing = Math.atan2(dy, dx);

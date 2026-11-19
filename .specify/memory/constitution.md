@@ -65,8 +65,8 @@ playthrough, and a README another attendee can follow.
 
 ## First Release Scope
 
-One core mechanic, a run of up to 20 difficulty levels, a browser, and a 60-minute workshop
-build. Change this budget only by updating the agreed scope.
+One core mechanic, a run of up to 20 difficulty levels, web browsers on desktop and mobile, and a
+60-minute workshop build. Change this budget only by updating the agreed scope.
 
 - **Core mechanic:** move-and-survive with automatic attacks and level-up ability choices.
 - **Run structure:** difficulty rises through levels 1–20 during a run; enemy count and strength
@@ -76,7 +76,8 @@ build. Change this budget only by updating the agreed scope.
   (experience → ability choice) are separate.
 - **Build budget:** to fit 60 minutes, difficulty levels MUST be data-driven scaling (spawn rate,
   enemy mix, stat multipliers), not 20 hand-built stages.
-- **Platform:** desktop browser, static files only, no install.
+- **Platform:** desktop and mobile web browsers, played with a keyboard or by touch; static files
+  only, no install. Gamepads, native or installable apps, and offline mode are out of scope.
 - Out of scope for v1 unless the scope is amended: meta-progression between runs, persistence,
   multiplayer, multiple maps.
 
@@ -93,6 +94,10 @@ Decisions made on 2026-11-18 while adopting the workshop starter constitution:
 - **Numbering:** C2–C4 were intentionally dropped; IDs are kept for traceability.
 - **C5 evidence (2026-11-19):** the truncated evidence line was completed and confirmed: same-origin
   requests only, and fixed-seed determinism (v1.0.1).
+- **Platform (2026-11-19):** the release scope's platform was widened from "desktop browser" to
+  desktop and mobile web browsers with keyboard or touch, so that feature 003 (mobile and touch play)
+  is inside the agreed scope. The game is published as static files on GitHub Pages. Gamepads,
+  native/installable apps, and offline mode stay out of scope (v2.0.0).
 
 ## Governance
 
@@ -106,4 +111,4 @@ a principle merely to make its implementation pass.
 - **Compliance review:** `/speckit-analyze` and every review of a slice MUST check the work
   against C1, C5, C6, C7 and the First Release Scope, and record pass / fail / not run.
 
-**Version**: 1.0.1 | **Ratified**: 2026-11-18 | **Last Amended**: 2026-11-19
+**Version**: 2.0.0 | **Ratified**: 2026-11-18 | **Last Amended**: 2026-11-19

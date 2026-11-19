@@ -245,7 +245,7 @@ each (quickstart.md F8, SC-007).
 - [x] T072 Run the 5-player playtest (F10) for SC-010 and SC-011, or record it as "not run" in README.md
 - [x] T075 Perform the originality review (constitution C1 Evidence, FR-025): confirm every enemy, tool, and passive name and description in data/game.json, all drawn shapes in ui/render.js, and all UI text in ui/screens.js are original and contain no third-party game names, characters, or assets; confirm the repository contains no image, audio, or font files from other games; record the result as F11 (pass / fail, date, reviewer) in README.md
 - [x] T073 [P] Finalise README.md: accurate description of the shipped game, controls, run/test commands, known issues, and the completed verification table including F11 from T075 (constitution C7)
-- [ ] T074 (Not done: publishing is outward-facing and was not requested; local subpath check passed — see README) Optional: publish to GitHub Pages and confirm data and modules load under the repository subpath; record the result in README.md
+- [x] T074 (Done by the project owner: the game is published at https://tjmohr.github.io/uptime-survivors/ — confirmed responding 2026-11-19 during feature 003; local subpath check also passed) Optional: publish to GitHub Pages and confirm data and modules load under the repository subpath; record the result in README.md
 
 ---
 

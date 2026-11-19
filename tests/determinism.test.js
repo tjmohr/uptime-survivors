@@ -79,9 +79,9 @@ test('determinism: engine source uses no Math.random, DOM, or network APIs', asy
   }
 });
 
-test('determinism: pure audio modules use no browser APIs, timers, or Math.random', async () => {
+test('determinism: pure audio and touch-UI modules use no browser APIs, timers, or Math.random', async () => {
   const banned = /Math\.random|\bdocument\b|\bwindow\b|\bfetch\b|AudioContext|setTimeout|setInterval|performance\.now|Date\.now/;
-  for (const file of ['audio/content.js', 'audio/director.js']) {
+  for (const file of ['audio/content.js', 'audio/director.js', 'ui/joystick.js', 'ui/tapguard.js', 'ui/view.js']) {
     const src = await readSource(file);
     const m = src.match(banned);
     assert(!m, `${file} contains '${m && m[0]}'`);

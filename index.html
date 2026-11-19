@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Uptime Survivors</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -33,7 +33,14 @@
       </div>
     </div>
     <ul id="hud-loadout" class="loadout" aria-label="Owned tools and passives"></ul>
+    <div class="touch-buttons">
+      <button id="touch-pause" class="touch-btn" type="button" aria-label="Pause">❚❚</button>
+      <button id="touch-sound" class="touch-btn" type="button" aria-label="Sound" aria-pressed="true">♪</button>
+    </div>
   </div>
+
+  <div id="joystick" class="joystick" aria-hidden="true"><div class="joystick-knob"></div></div>
+  <div id="rotate-hint" class="rotate-hint" aria-hidden="true">Rotate your device for more room</div>
 
   <div id="banner" class="banner" hidden></div>
   <div id="overlay" class="overlay"></div>

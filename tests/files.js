@@ -10,4 +10,6 @@ export const testFiles = [
   './determinism.test.js',
   './audio-content.test.js',
   './audio-director.test.js',
+  './movement.test.js',
+  './touch-ui.test.js',
 ];

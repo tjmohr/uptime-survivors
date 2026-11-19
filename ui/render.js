@@ -3,10 +3,18 @@
 
 import { orbitPositions, PROJECTILE_RADIUS, BARRIER_RADIUS } from '../engine/weapons.js';
 import { ENGINEER_RADIUS } from '../engine/behaviors.js';
+import { viewScale, viewHalfShort } from './view.js';
 
-// Half-diagonal of the visible world area. Kept below the engine's spawn distance (720)
-// so enemies always appear off-screen.
-const VIEW_RADIUS = 660;
+// The camera shows at least VIEW_RADIUS (660) game units across half the screen diagonal on desktop,
+// kept below the engine's spawn distance (720) so enemies appear off-screen; on small screens it zooms
+// out so the short side still shows at least 330 units each way (ui/view.js, feature 003 FR-015).
+
+// Adaptive quality (003 data-model.md › Render Quality): average frame time over a 2 s window above
+// 20 ms steps down one level; never steps up in a page session.
+const QUALITY_DPR_CAP = [2, 1.5, 1, 1];
+const QUALITY_WINDOW_MS = 2000;
+const QUALITY_THRESHOLD_MS = 20;
+const QUALITY_IGNORE_FRAME_MS = 500; // stalls from tab switches / pauses are not render cost
 const GRID = 64;
 const COLORS = {
   bg: '#05080f',
@@ -66,7 +74,7 @@ function makeSprite(shape, color, r) {
   return { canvas: c, size, r };
 }
 
-export function createRenderer(canvas, data) {
+export function createRenderer(canvas, data, { showFps = false } = {}) {
   const ctx = canvas.getContext('2d');
   const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
   const sprites = new Map();
@@ -78,18 +86,56 @@ export function createRenderer(canvas, data) {
   let rings = [];
   let flash = 0;
   let shake = 0;
+  let quality = 0;
+  let qualityMs = 0;
+  let qualityFrames = 0;
+  let resizes = 0;
+  const frameLog = []; // [timestamp ms, frame ms] for the last 5 s (fps overlay and stats)
 
-  const reduced = () => motionQuery.matches;
+  // Lowest quality also drops particles and the hit flash, like reduced motion.
+  const reduced = () => motionQuery.matches || quality >= 3;
 
   function resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    w = window.innerWidth;
-    h = window.innerHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, QUALITY_DPR_CAP[quality]);
+    const vv = window.visualViewport;
+    w = window.innerWidth || (vv ? vv.width : 0);
+    h = window.innerHeight || (vv ? vv.height : 0);
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
-    scale = Math.max(1, Math.hypot(w, h) / 2 / VIEW_RADIUS) * dpr;
+    scale = viewScale(w, h) * dpr;
+    resizes += 1;
   }
   addEventListener('resize', resize);
+  addEventListener('orientationchange', resize);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+
+  function trackFrame(frameSeconds) {
+    const ms = frameSeconds * 1000;
+    if (ms <= 0) return;
+    const now = performance.now();
+    frameLog.push([now, ms]);
+    while (frameLog.length && now - frameLog[0][0] > 5000) frameLog.shift();
+    if (ms > QUALITY_IGNORE_FRAME_MS || quality >= 3) return;
+    qualityMs += ms;
+    qualityFrames += 1;
+    if (qualityMs >= QUALITY_WINDOW_MS) {
+      if (qualityMs / qualityFrames > QUALITY_THRESHOLD_MS) {
+        quality += 1;
+        if (QUALITY_DPR_CAP[quality] !== QUALITY_DPR_CAP[quality - 1]) resize();
+        if (quality >= 3) { particles = []; flash = 0; shake = 0; }
+      }
+      qualityMs = 0;
+      qualityFrames = 0;
+    }
+  }
+
+  function frameSummary() {
+    if (!frameLog.length) return { fps: 0, p95: 0, worst: 0 };
+    const times = frameLog.map((f) => f[1]);
+    const sorted = [...times].sort((a, b) => a - b);
+    const avg = times.reduce((a, b) => a + b, 0) / times.length;
+    return { fps: 1000 / avg, p95: sorted[Math.floor(sorted.length * 0.95)], worst: sorted[sorted.length - 1] };
+  }
   resize();
 
   function sprite(key, shape, color, r) {
@@ -227,10 +273,30 @@ export function createRenderer(canvas, data) {
     rings = rings.filter((r) => r.life > 0);
     flash = Math.max(0, flash - dt);
     shake = Math.max(0, shake - dt);
+
+    trackFrame(frameSeconds);
+    if (showFps) {
+      // Test-only overlay (?fps=1) for measuring real phones (003 SC-004, quickstart H4).
+      const f = frameSummary();
+      const dpr = canvas.width / Math.max(1, w);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.font = '12px ui-monospace, Menlo, monospace';
+      const text = `${f.fps.toFixed(0)} fps · p95 ${f.p95.toFixed(1)} ms · worst ${f.worst.toFixed(0)} ms · ` +
+        `${run.enemies.length} enemies · q${quality}`;
+      const tw = ctx.measureText(text).width;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(8, h - 30, tw + 12, 20);
+      ctx.fillStyle = '#facc15';
+      ctx.fillText(text, 14, h - 16);
+    }
   }
 
   // Effect counts for automated checks (e.g. reduced motion).
-  const stats = () => ({ particles: particles.length, rings: rings.length, flash, shake, reducedMotion: reduced(), scale });
+  const stats = () => ({
+    particles: particles.length, rings: rings.length, flash, shake, reducedMotion: motionQuery.matches, scale,
+    viewScale: viewScale(w, h), viewHalfShort: viewHalfShort(w, h), width: w, height: h,
+    canvasWidth: canvas.width, canvasHeight: canvas.height, quality, resizes, frames: frameSummary(),
+  });
 
   return { draw, handleEvents, resize, stats };
 }

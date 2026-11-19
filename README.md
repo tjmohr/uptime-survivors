@@ -18,6 +18,8 @@ From the repository root:
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
+Or play the published version: **https://tjmohr.github.io/uptime-survivors/** (desktop or phone).
+
 Open **http://127.0.0.1:8000/** (on Windows use `py` instead of `python3`). Opening `index.html`
 directly with `file://` is not supported — the game loads `data/game.json` and `data/audio.json`
 over HTTP.
@@ -28,6 +30,7 @@ Testing URLs:
 - Fast full run (each level 2 s, 40 s total): `http://127.0.0.1:8000/?seed=12345&levelSeconds=2`
   — also the quickest way to hear the music speed up and gain layers
 - Sound failure path: `http://127.0.0.1:8000/?audioFail=1` (game plays silently, HUD says "Sound unavailable")
+- Frame-rate overlay (for measuring phones): `?fps=1`
 
 ## Test it
 
@@ -37,7 +40,8 @@ Testing URLs:
   Both exit with code 0 only if every test passes; zero tests found counts as a failure.
 - **Scripted browser checks** (needs Google Chrome): `python3 tests/browser/drive.py` runs the
   milestone, full-roster, and sound checks in headless Chrome against its own local server
-  (`--only audio` for just the sound checks); add
+  (`--only audio` for just the sound checks, `--only touch` for the touch/mobile checks, which drive
+  Chrome over its DevTools Protocol with real touch input and phone-sized screens); add
   `--full-run` for the real-time 20-minute run. They use synthetic key presses and, for long runs,
   test-only invincibility — they complement, not replace, a human playthrough.
 
@@ -51,7 +55,22 @@ Testing URLs:
 | Level-up | **1**, **2**, **3**, or click / Tab + Enter |
 | End screen | **New Run** (new seed) or **Replay Seed** (same seed) |
 | Any screen | **M** to mute / unmute all sound |
-| Paused | **Sound** on/off button, **Music** and **Effects** volume sliders (0–100% in 10% steps; arrow keys or mouse) |
+| Paused | **Sound** on/off button, **Music** and **Effects** volume sliders (0–100% in 10% steps; arrow keys, mouse, or touch) |
+
+**Touch (phones and tablets):** touch anywhere and drag to steer — a joystick appears under your
+finger, the engineer runs at full speed in that direction, and lifting your finger stops it. Use the
+**❚❚** button to pause and **♪** to mute. On the level-up and pause screens, lift your finger first
+and then tap: a finger that was already on the screen when the screen opened never selects
+anything, and taps in the first half second are ignored, so upgrades are never picked by accident.
+
+## Play on a phone
+
+Open **https://tjmohr.github.io/uptime-survivors/** in Safari (iPhone) or Chrome (Android). Portrait
+and landscape both work; on phones the view zooms out so you always see at least 330 game units in
+every direction. The page does not scroll, zoom, or refresh while you play, and switching apps or
+locking the screen pauses the game. On iPhone, the ring/silent switch can keep browser audio silent
+even when the game's sound is on. Touch controls appear automatically on phones and tablets, and on
+any other device as soon as its screen is touched; desktops that are never touched look unchanged.
 
 ## Sound
 
@@ -77,8 +96,9 @@ or unavailable. Every sounded event keeps its visual feedback.
 
 First playable is built: all 5 enemies, 4 tools, 2 passives, and 20 difficulty levels, plus
 synthesized sound effects and music (feature 002). Automated and scripted-browser checks pass (see
-Verification). **Still outstanding:** a human playthrough, the 5-player playtest (F10: SC-010,
-SC-011), a human review of the networking descriptions (SC-007), human listening tests for the sound
+Verification), and touch play on phones and tablets (feature 003) is checked in emulated phones with
+real touch input. **Still outstanding:** a human playthrough, checks on real phones (feature 003
+H1–H5) and a phone playtest (H6), the 5-player playtest (F10: SC-010, SC-011), a human review of the networking descriptions (SC-007), human listening tests for the sound
 (H1–H3), and checks in browsers other than Chrome.
 
 ### Known limits
@@ -92,15 +112,20 @@ SC-011), a human review of the networking descriptions (SC-007), human listening
   cannot judge how it sounds. Nobody has listened to the sound yet (H1–H3 not run).
 - With `?levelSeconds=2`, difficulty rises 30× faster than levelling, so those runs usually end in a
   loss; use `?levelSeconds=0.5` to see the win screen quickly.
-- Not published to GitHub Pages. Serving the repo from a subpath (`/uptime-survivors/`) locally loads
-  the game correctly.
+- Touch checks run in headless Chrome emulating phones; that is not Safari and not a real phone.
+  Real-device checks (H1–H5) and the phone playtest (H6) have not been run. Performance on older or
+  mid-range phones is only approximated (CPU throttled 4× on the dev Mac) and is unverified.
+- On a touchscreen laptop, after the screen has been touched, the level-up and pause screens also
+  ignore mouse clicks for their first half second (the touch guard applies to the whole screen).
+  Keyboard selection is never delayed.
 
 ## Verification
 
 Scenarios are defined in
 [`specs/001-survivors-first-playable/quickstart.md`](specs/001-survivors-first-playable/quickstart.md)
 (M, F, SC rows) and [`specs/002-procedural-audio/quickstart.md`](specs/002-procedural-audio/quickstart.md)
-(A, B, H rows: sound). A checked task box is not evidence; this table is. Unrun checks stay visible
+(A, B, H rows: sound), and [`specs/003-mobile-touch/quickstart.md`](specs/003-mobile-touch/quickstart.md)
+(U, T, and "Phone H" rows: touch and mobile). A checked task box is not evidence; this table is. Unrun checks stay visible
 as "not run". M1/F1 record the test count when feature 001 was verified; the current count is in A1–A5.
 
 | # | Check | Result | Date | Environment | Evidence / notes |
@@ -144,19 +169,44 @@ as "not run". M1/F1 record the test count when feature 001 was verified; the cur
 | H1 | Listening test (SC-003) | not run |  |  | Needs a listener to match the 10 effects to their events (≥ 9 of 10). |
 | H2 | Sound adds to the game (SC-008) | not run |  |  | Needs 5 playtesters (≥ 3 positive, none "harsh" after 5 minutes). Default volumes and effect voices are untuned starting values. |
 | H3 | Music character | not run |  |  | Needs a listener to confirm a minimal techno pulse that builds with difficulty. |
+| U1 | Any-angle movement input | pass | 2026-11-19 | jsc + Chrome 157 headless | 0°, 30°, 45°, 137°, 300° move exactly `moveSpeed` in that direction; short drags still full speed; values beyond ±1 clamp; NaN/Infinity/strings count as 0. Keyboard inputs give identical state hashes (existing determinism tests unchanged). 113/113 tests pass. |
+| U2 | Touch replay determinism | pass | 2026-11-19 | jsc + Chrome 157 headless | A recorded 1,800-step sequence of arbitrary-angle inputs replays to an identical hash (SC-007). |
+| U3 | Joystick math | pass | 2026-11-19 | jsc + Chrome 157 headless | Dead zone (10% of 56 px) → no movement; unit direction beyond it; base follows the finger past the edge; no NaN when finger = base. |
+| U4 | Tap guard timing | pass | 2026-11-19 | jsc + Chrome 157 headless | Held-at-open finger blocks until lifted; nothing before 500 ms; exactly 500 ms arms; unrelated fingers do not block. |
+| U5 | View distance | pass | 2026-11-19 | jsc + Chrome 157 headless | Short side always shows ≥ 330 game units (320×480 to 2560×1440); 1400×1000 desktop scale unchanged (1.3034); 390×844 → 0.591 in either orientation. |
+| T1 | Touch mode | pass | 2026-11-19 | Chrome 157 headless via DevTools Protocol (emulated 390×844 phone, real touch events) | Phone: touch mode on at load, touch reminder on title, Pause/Sound buttons ≥ 44 px. Desktop (no touch): no touch UI during a run; first touch turns it on. |
+| T2 | Touch steering | pass | 2026-11-19 | Chrome 157 headless via DevTools Protocol | Drag at 30° → heading 30.0° at exactly 160 u/s (`moveSpeed`), moving on the first frame after the drag; stops ~30 ms after lifting (SC-002 ≤ 100 ms); joystick shown/hidden; second finger ignored; touch on HUD text steers; Pause button pauses without steering. |
+| T3 | Everything by tap | pass | 2026-11-19 | Chrome 157 headless via DevTools Protocol | Sound running ~150 ms after the Start tap (FR-019); Sound button mutes/unmutes; 3 upgrades chosen; pause, both sliders set by touch (30% / 50%), Sound toggle, Resume, Quit to Title, New Run, Replay Seed (same seed) — all by tap. Every control has visible text or a label; no hover-only tooltips (FR-021). |
+| T4 | Tap guard | pass | 2026-11-19 | Chrome 157 headless via DevTools Protocol | Finger held when level-up opened, lifted over a choice → nothing chosen; tap 50 ms after opening ignored, tap after 500 ms chose and play resumed within ~90 ms; pause screen: Resume ignored while the held finger stays down, dragging it across the Music slider changed nothing; keyboard 1 not delayed. |
+| T5 | Page stays put | pass | 2026-11-19 | Chrome 157 headless via DevTools Protocol | Vigorous drags, double tap, 1.2 s long press, pull-down from the top, pinch: no scroll, zoom 1, no reload, no selection, no context menu. Desktop without touch: text still selectable. Headless Chrome is not iOS Safari — see Phone H2. |
+| T6 | Fit and safe area | pass | 2026-11-19 | Chrome 157 headless, emulated safe-area insets (47/34 px portrait, 47/47/21 px landscape) | 360×640, 390×844, 844×390, 768×1024, 1024×768: title, HUD, level-up, pause, and end screens all inside the viewport and safe area, no panel scrolling, no page overflow. Landscape phones show level-up choices side by side. |
+| T7 | Rotation | pass | 2026-11-19 | Chrome 157 headless via DevTools Protocol | 390×844 → 844×390 mid-run: re-fit within ~70 ms including protocol round-trips; same run (seed, phase playing, ticks continuing); view 330 units. |
+| T8 | View distance on screen | pass | 2026-11-19 | Chrome 157 headless | Phones 330 units, tablets 384 units each way; desktop 1400×1000 scale 1.3034 = feature 001. |
+| T9 | Slow-device proxy (SC-004) | pass (proxy) | 2026-11-19 | Chrome 157 headless, 390×844, CPU throttled 4× on the dev Mac | ~160 enemies: avg 60 fps, max 17 ms; ~310 enemies: avg ~55 fps, p95 ~33 ms, max ~33 ms; quality governor stayed at level 0 (never needed). Throttling slows scripts only, not drawing, so this is a weak stand-in for a real mid-range phone. |
+| T10 | Hidden page | pass | 2026-11-19 | Chrome 157 headless via DevTools Protocol | `pagehide` → game paused, sound suspended. `visibilitychange`/`blur` share the same handler (001 F6, 002 B3). |
+| T11 | Desktop unchanged | pass | 2026-11-19 | Chrome 157 headless; jsc | All 001 checks (M2–M9, F2–F9) and 002 checks (A1, A6, B1–B8) pass after feature 003; desktop render scale unchanged. |
+| FR-021 | No hover-only information | pass | 2026-11-19 | T3 + inspection | Every button and slider has visible text or an accessible label; no `title` tooltips. |
+| Phone H1 | Full run by touch on real phones | not run |  |  | Needs the current iPhone (Safari) and Android phone (Chrome): title to end screen and a second run, touch only (SC-001). |
+| Phone H2 | Page stays put on real phones | not run |  |  | 5 minutes of vigorous play: no scroll, zoom, refresh, or menu (SC-003). iOS pinch/double-tap handling is the main risk. |
+| Phone H3 | Fit, notch, rotation on real phones | not run |  |  | Both orientations; nothing behind the notch; rotation keeps the run. |
+| Phone H4 | Frame rate on real phones | not run |  |  | Open `?fps=1&seed=99`, play until ~300 enemies: ≥ 55 fps avg, no freeze > 0.25 s (SC-004). Older/mid-range phones: unverified. |
+| Phone H5 | Sound on real phones | not run |  |  | Starts on the Start tap; ♪ button mutes; note iPhone silent-switch behaviour. |
+| Phone H6 | Phone playtest (SC-008) | not run |  |  | 5 people on their own phones: ≥ 3 finish a first run without instructions and find the controls comfortable; no accidental choices. |
 
 ## Project layout
 
 ```text
 index.html, style.css, main.js   Page shell, styles, game loop and wiring
 engine/                          Pure game rules (no DOM, seeded randomness)
-ui/                              Canvas rendering, HUD, screens, input, URL params
+ui/                              Canvas rendering, HUD, screens, keyboard + touch input, URL params;
+                                 pure helpers joystick.js, tapguard.js, view.js; touchmode.js
 audio/                           Sound: data validation and event→sound decisions (pure), Web Audio synth
 data/game.json                   All enemies, tools, passives, difficulty, tuning
 data/audio.json                  All sound design: effects, music layers, tempos, volumes, limits
 tests/                           Test harness, browser + terminal runners, tests
 specs/001-survivors-first-playable/   Spec, plan, tasks, contracts, quickstart
 specs/002-procedural-audio/      Sound feature: spec, plan, tasks, contracts, quickstart
+specs/003-mobile-touch/          Touch and mobile feature: spec, plan, tasks, contracts, quickstart
 ```
 
 ## License

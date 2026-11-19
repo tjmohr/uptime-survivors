@@ -9,6 +9,7 @@ usage (from the repository root):
     python3 tests/browser/drive.py --full-run      # also the real-time 20-minute run (F4)
     python3 tests/browser/drive.py --only smoke2    # just one page
     python3 tests/browser/drive.py --only audio     # just the sound checks (B1–B8)
+    python3 tests/browser/drive.py --only touch     # just the touch/mobile checks (T1–T10, feature 003)
     python3 tests/browser/drive.py --chrome "/path/to/chrome"
 
 These checks drive the game with synthetic key presses and, for long checks, make the engineer
@@ -24,6 +25,10 @@ import sys
 import tempfile
 import time
 import urllib.parse
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cdp import CDP  # noqa: E402  (stdlib-only DevTools Protocol client, feature 003)
+import touch_checks  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DEFAULT_CHROME = {
@@ -96,6 +101,30 @@ def run_page(chrome, base, log_path, page, extra, timeout):
         shutil.rmtree(profile, ignore_errors=True)
 
 
+def run_cdp_check(chrome, base, func):
+    """Feature 003: a check driven from Python over the DevTools Protocol (trusted touches, emulation)."""
+    profile = tempfile.mkdtemp(prefix="uptime-chrome-")
+    port = free_port()
+    proc = subprocess.Popen(
+        [chrome, "--headless=new", "--disable-gpu", f"--user-data-dir={profile}", f"--remote-debugging-port={port}",
+         "--remote-allow-origins=*", "--autoplay-policy=no-user-gesture-required",
+         "--disable-background-timer-throttling", "--disable-renderer-backgrounding",
+         "--disable-backgrounding-occluded-windows", "about:blank"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    c = None
+    try:
+        c = CDP(port)
+        return func(c, base)
+    except Exception as err:  # noqa: BLE001 — report any failure as an error row
+        return {"error": f"{type(err).__name__}: {err}"}
+    finally:
+        if c:
+            c.close()
+        proc.kill()
+        proc.wait()
+        shutil.rmtree(profile, ignore_errors=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--chrome", default=DEFAULT_CHROME)
@@ -137,6 +166,18 @@ def main():
                     print(f"  {'PASS' if passed else 'FAIL'} F9 (reduced motion {'on' if expect_reduced else 'off'}): {value}")
                 elif name != "mode":
                     print(f"  {name}: {value}")
+        for label, func, _timeout in touch_checks.CHECKS:
+            if args.only and args.only not in label:
+                continue
+            result = run_cdp_check(args.chrome, f"http://127.0.0.1:{port}", func)
+            print(f"\n== {label}")
+            for name, value in result.items():
+                if name == "error":
+                    ok = False
+                    print(f"  ERROR: {value}")
+                else:
+                    ok &= bool(value["pass"])
+                    print(f"  {'PASS' if value['pass'] else 'FAIL'} {name}: {value['note']}")
     finally:
         server.kill()
         server.wait()

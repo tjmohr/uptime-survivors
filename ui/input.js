@@ -1,5 +1,7 @@
-// Keyboard input (contracts/ui-controls.md › Keyboard). Nothing here runs at import time,
-// so the pure helper below can be tested outside a browser.
+// Keyboard and touch input (001 contracts/ui-controls.md › Keyboard; 003 contracts/input.md).
+// Nothing here runs at import time, so the pure helper below can be tested outside a browser.
+
+import { joystickStep } from './joystick.js';
 
 const LEFT = ['ArrowLeft', 'KeyA'];
 const RIGHT = ['ArrowRight', 'KeyD'];
@@ -16,8 +18,44 @@ export function moveFromKeys(held) {
   };
 }
 
-export function createInput({ onPauseKey, onChoiceKey, onFocusLost, onMuteKey = () => {}, onFocusGained = () => {} }) {
+export function createInput({
+  onPauseKey, onChoiceKey, onFocusLost, onMuteKey = () => {}, onFocusGained = () => {},
+  canvas = null, isPlaying = () => false,
+}) {
   const held = new Set();
+  // Touch steering (003 data-model.md › Touch Steering State): one steering pointer at a time.
+  const touch = { pointerId: null, base: null, point: null, dx: 0, dy: 0 };
+
+  function endSteering() {
+    if (touch.pointerId !== null && canvas && canvas.hasPointerCapture?.(touch.pointerId)) {
+      try { canvas.releasePointerCapture(touch.pointerId); } catch {}
+    }
+    touch.pointerId = null;
+    touch.base = touch.point = null;
+    touch.dx = touch.dy = 0;
+  }
+
+  if (canvas) {
+    canvas.addEventListener('pointerdown', (ev) => {
+      if (ev.pointerType !== 'touch' || touch.pointerId !== null || !isPlaying()) return;
+      ev.preventDefault();
+      touch.pointerId = ev.pointerId;
+      touch.base = { x: ev.clientX, y: ev.clientY };
+      touch.point = { x: ev.clientX, y: ev.clientY };
+      try { canvas.setPointerCapture(ev.pointerId); } catch {}
+    });
+    canvas.addEventListener('pointermove', (ev) => {
+      if (ev.pointerId !== touch.pointerId) return;
+      touch.point = { x: ev.clientX, y: ev.clientY };
+      const r = joystickStep(touch.base, touch.point);
+      touch.base = r.base;
+      touch.dx = r.dx;
+      touch.dy = r.dy;
+    });
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+      canvas.addEventListener(type, (ev) => { if (ev.pointerId === touch.pointerId) endSteering(); });
+    }
+  }
 
   addEventListener('keydown', (ev) => {
     // Arrow keys on a slider (pause-screen volume) belong to the slider, not to movement.
@@ -41,17 +79,29 @@ export function createInput({ onPauseKey, onChoiceKey, onFocusLost, onMuteKey = 
 
   const lose = () => {
     held.clear();
+    endSteering();
     onFocusLost();
   };
   addEventListener('blur', lose);
+  addEventListener('pagehide', lose); // iOS: app switch / tab close (003 FR-016)
   addEventListener('focus', onFocusGained);
+  addEventListener('pageshow', (ev) => { if (ev.persisted && !document.hidden) onFocusGained(); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) lose();
     else if (document.hasFocus()) onFocusGained();
   });
 
   return {
-    move: () => moveFromKeys(held),
-    clear: () => held.clear(),
+    // Touch wins while a steering finger is down; otherwise the keyboard.
+    move() {
+      if (touch.pointerId !== null && !isPlaying()) endSteering();
+      return touch.pointerId !== null ? { dx: touch.dx, dy: touch.dy } : moveFromKeys(held);
+    },
+    joystick: () => (touch.pointerId === null ? null : { base: { ...touch.base }, point: { ...touch.point } }),
+    stopSteering: endSteering,
+    clear() {
+      held.clear();
+      endSteering();
+    },
   };
 }

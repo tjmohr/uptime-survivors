@@ -330,7 +330,8 @@ scope amendment:
 - No audio (music or sound effects). *Lifted by feature 002 — sound effects and music are specified in
   [`specs/002-procedural-audio/`](../002-procedural-audio/spec.md); all other non-goals still apply.*
 - No multiple maps or hand-built stages; one open map, with difficulty driven by data.
-- No mobile/touch controls or gamepad support.
+- No mobile/touch controls or gamepad support. *Touch controls are added by feature 003
+  ([`specs/003-mobile-touch/`](../003-mobile-touch/spec.md)); gamepad support is still a non-goal.*
 - No quiz, question, or grading mechanics; leftover quiz material in the starter kit does not
   apply.
 

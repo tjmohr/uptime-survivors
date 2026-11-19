@@ -4,6 +4,7 @@ import { validateGameData } from './engine/content.js';
 import { createRun, step, chooseUpgrade, pause, resume, STEP_SECONDS } from './engine/run.js';
 import { readParams, describeParams } from './ui/params.js';
 import { createScreens } from './ui/screens.js';
+import { createTouchMode } from './ui/touchmode.js';
 import { createHud } from './ui/hud.js';
 import { createRenderer } from './ui/render.js';
 import { createInput } from './ui/input.js';
@@ -13,7 +14,8 @@ import { createAudio } from './audio/synth.js';
 
 const MAX_STEPS_PER_FRAME = 5;
 const params = readParams(location.search);
-const screens = createScreens();
+const touchMode = createTouchMode();
+const screens = createScreens({ touchMode });
 
 const state = {
   data: null,
@@ -85,6 +87,8 @@ function startRun(seed) {
 
 function quitToTitle() {
   state.run = null;
+  input.stopSteering();
+  drawJoystick();
   if (audio) audio.stopMusic();
   hud.hide();
   screens.clearBanners();
@@ -140,6 +144,36 @@ function handleEvents() {
   if (run.phase === 'levelup' && screens.current !== 'levelup') screens.showLevelUp(run, choose);
 }
 
+// A touch button acts when the finger that pressed it lifts over it, even while another finger is
+// steering (a second-finger tap does not always produce a click). Mouse and keyboard use click.
+function touchButton(el, action) {
+  let pressed = null;
+  let suppressClickUntil = 0;
+  el.addEventListener('pointerdown', (ev) => {
+    if (ev.pointerType !== 'touch') return;
+    pressed = ev.pointerId;
+    try { el.releasePointerCapture(ev.pointerId); } catch {}
+  });
+  el.addEventListener('pointerup', (ev) => {
+    if (ev.pointerType !== 'touch' || ev.pointerId !== pressed) return;
+    pressed = null;
+    suppressClickUntil = performance.now() + 600;
+    action();
+  });
+  el.addEventListener('pointerleave', (ev) => { if (ev.pointerId === pressed) pressed = null; });
+  el.addEventListener('click', () => { if (performance.now() >= suppressClickUntil) action(); });
+}
+
+const joystickEl = document.getElementById('joystick');
+function drawJoystick() {
+  const j = input.joystick();
+  joystickEl.classList.toggle('active', j !== null);
+  if (!j) return;
+  joystickEl.style.transform = `translate(${j.base.x}px, ${j.base.y}px)`;
+  const knob = joystickEl.firstElementChild;
+  knob.style.transform = `translate(${j.point.x - j.base.x}px, ${j.point.y - j.base.y}px)`;
+}
+
 function frame(now) {
   requestAnimationFrame(frame);
   const elapsed = state.lastFrame === null ? 0 : Math.min((now - state.lastFrame) / 1000, 0.25);
@@ -160,6 +194,8 @@ function frame(now) {
     handleEvents();
   }
   audio.setDucked(run.phase === 'paused' || run.phase === 'levelup');
+  if (run.phase !== 'playing') input.stopSteering(); // a held finger never steers into the next screen
+  drawJoystick();
   renderer.draw(run, elapsed);
   hud.update(run);
 }
@@ -200,8 +236,10 @@ async function boot() {
   audio = createAudio(audioData, Object.defineProperty(state.sound, 'forceFail', { value: params.audioFail, enumerable: false }));
   director = createDirector(audioData);
   hud = createHud(describeParams(params));
-  renderer = createRenderer(document.getElementById('game'), state.data);
+  renderer = createRenderer(document.getElementById('game'), state.data, { showFps: params.fps });
   input = createInput({
+    canvas: document.getElementById('game'),
+    isPlaying: () => state.run !== null && state.run.phase === 'playing',
     onPauseKey: togglePause,
     onChoiceKey: choose,
     onFocusLost: () => {
@@ -211,6 +249,9 @@ async function boot() {
     onFocusGained: () => audio.resume(), // music comes back ducked: the game is paused
     onMuteKey: toggleMute,
   });
+  // On-screen touch buttons (003 FR-006): same actions as Esc/P and M.
+  touchButton(document.getElementById('touch-pause'), togglePause);
+  touchButton(document.getElementById('touch-sound'), toggleMute);
   showSoundStatus();
   quitToTitle();
   requestAnimationFrame(frame);
@@ -221,6 +262,8 @@ globalThis.__uptimeSurvivors = {
   get run() { return state.run; },
   get data() { return state.data; },
   get render() { return renderer ? renderer.stats() : null; },
+  get touchMode() { return touchMode.on; },
+  get joystick() { return input ? input.joystick() : null; },
   get audio() { return audio ? { ...audio.stats(), directorCounts: { ...director.counts } } : null; },
 };
 

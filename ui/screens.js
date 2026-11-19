@@ -2,6 +2,10 @@
 // (contracts/ui-controls.md › Screens).
 
 import { formatTime } from './hud.js';
+import { createTapGuard } from './tapguard.js';
+
+// Screens whose touch selections are guarded (003 FR-008, clarification Q5).
+const GUARDED = new Set(['levelup', 'paused']);
 
 const STAT_LABELS = {
   damage: 'Damage',
@@ -51,13 +55,63 @@ function el(tag, props = {}, ...children) {
   return node;
 }
 
-export function createScreens() {
+export function createScreens({ touchMode = null } = {}) {
   const overlay = document.getElementById('overlay');
   const live = document.getElementById('live');
   const banner = document.getElementById('banner');
   let current = null;
   let bannerQueue = [];
   let bannerTimer = null;
+  let titleStart = null;
+
+  // ---- Tap guard (touch only; mouse, pen, and keyboard are never delayed) ----
+  const touchesDown = new Set();
+  let guard = null;
+  let guardTimer = null;
+  let lastPointer = { type: null, armed: true };
+
+  const guardActive = () => guard !== null && touchMode !== null && touchMode.on;
+  const canArmNow = () => !guardActive() || guard.canArm(performance.now(), touchesDown);
+
+  // While the guard cannot arm, the panel ignores pointers entirely, so buttons, choices, and sliders
+  // never react to an unarmed touch (a cancelled event alone cannot stop a slider moving).
+  function refreshGuard() {
+    clearTimeout(guardTimer);
+    guardTimer = null;
+    if (!guardActive()) return overlay.classList.remove('guard-wait');
+    const ready = canArmNow();
+    overlay.classList.toggle('guard-wait', !ready);
+    if (!ready) guardTimer = setTimeout(refreshGuard, Math.max(16, guard.readyAt() - performance.now()));
+  }
+
+  addEventListener('pointerdown', (ev) => { if (ev.pointerType === 'touch') touchesDown.add(ev.pointerId); }, { capture: true });
+  for (const type of ['pointerup', 'pointercancel']) {
+    addEventListener(type, (ev) => {
+      if (ev.pointerType !== 'touch') return;
+      touchesDown.delete(ev.pointerId);
+      if (guard) refreshGuard();
+    }, { capture: true });
+  }
+  overlay.addEventListener('pointerdown', (ev) => {
+    const armed = ev.pointerType !== 'touch' || canArmNow();
+    lastPointer = { type: ev.pointerType, armed };
+    if (!armed) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+  }, { capture: true });
+  overlay.addEventListener('click', (ev) => {
+    // Backstop: a click produced by an unarmed touch does nothing. Keyboard clicks (Enter/Space) have
+    // no preceding pointerdown of type 'touch' and pass through.
+    if (lastPointer.type === 'touch' && !lastPointer.armed && ev.detail !== 0) {
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+    }
+    lastPointer = { type: null, armed: true };
+  }, { capture: true });
+  overlay.addEventListener('input', (ev) => {
+    if (lastPointer.type === 'touch' && !lastPointer.armed) ev.stopImmediatePropagation();
+  }, { capture: true });
 
   function announce(text) {
     live.textContent = '';
@@ -67,6 +121,9 @@ export function createScreens() {
 
   function open(name, panel, spoken) {
     current = name;
+    guard = GUARDED.has(name) ? createTapGuard(performance.now(), touchesDown) : null;
+    lastPointer = { type: null, armed: true };
+    refreshGuard();
     overlay.replaceChildren(panel);
     overlay.classList.add('open');
     const first = panel.querySelector('button');
@@ -76,6 +133,8 @@ export function createScreens() {
 
   function close() {
     current = null;
+    guard = null;
+    refreshGuard();
     overlay.classList.remove('open');
     overlay.replaceChildren();
   }
@@ -94,17 +153,28 @@ export function createScreens() {
   }
 
   function showTitle(onStart) {
-    open('title', el('div', { className: 'panel' },
-      el('h1', {}, 'UPTIME SURVIVORS'),
-      el('p', { className: 'prompt' }, 'Network problems are inbound. Keep the network up for 20 levels.'),
-      el('ul', { className: 'controls' },
+    titleStart = onStart;
+    const touch = touchMode !== null && touchMode.on;
+    // 003 FR-009: touch devices get touch controls in the reminder.
+    const controls = touch
+      ? [
+        el('li', {}, 'Steer: touch and drag anywhere — your tools fire on their own'),
+        el('li', {}, 'Level-up: lift your finger, then tap a choice'),
+        el('li', {}, 'Pause: ❚❚ button'),
+        el('li', {}, 'Sound: ♪ button')]
+      : [
         el('li', {}, 'Move: WASD or arrow keys — your tools fire on their own'),
         el('li', {}, 'Level-up: press 1, 2, or 3 to choose'),
         el('li', {}, 'Pause: Esc or P'),
-        el('li', {}, 'Sound: M to mute')),
+        el('li', {}, 'Sound: M to mute')];
+    open('title', el('div', { className: 'panel' },
+      el('h1', {}, 'UPTIME SURVIVORS'),
+      el('p', { className: 'prompt' }, 'Network problems are inbound. Keep the network up for 20 levels.'),
+      el('ul', { className: 'controls' }, ...controls),
       el('div', { className: 'btn-row' }, el('button', { onclick: onStart }, 'Start'))),
-    'Uptime Survivors. Press Enter to start.');
+    touch ? 'Uptime Survivors. Tap Start to begin.' : 'Uptime Survivors. Press Enter to start.');
   }
+  if (touchMode) touchMode.onChange(() => { if (current === 'title' && titleStart) showTitle(titleStart); });
 
   function showLevelUp(run, onChoose) {
     const items = run.offer.map((o, i) => {
