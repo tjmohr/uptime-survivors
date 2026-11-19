@@ -100,10 +100,13 @@ test('passives: Redundant Power Supply raises max Uptime and regenerates per sec
   assertApprox(run.engineer.uptime, 50 + rank.regenPerSecond, 1e-6);
 });
 
-test('roster: the full first playable has 5 enemies, 4 tools, and 2 passives', async () => {
+test('roster: 5 enemies, 7 tools, 6 passives, and Capacity Planning (features 001 + 006)', async () => {
   const run = await quietRun();
   assertEqual(run.data.enemies.map((e) => e.id),
     ['dropped-packet', 'latency-spike', 'broadcast-storm', 'route-flap', 'ddos-botnet']);
-  assertEqual(run.data.tools.map((t) => t.id), ['ping', 'firewall-rule', 'ansible-playbook', 'load-balancer']);
-  assertEqual(run.data.passives.map((p) => p.id), ['bandwidth-upgrade', 'redundant-power-supply']);
+  assertEqual(run.data.tools.map((t) => t.id),
+    ['ping', 'firewall-rule', 'ansible-playbook', 'load-balancer', 'traceroute', 'rate-limiter', 'null-route']);
+  assertEqual(run.data.passives.map((p) => p.id), ['bandwidth-upgrade', 'redundant-power-supply', 'qos-policy',
+    'link-aggregation', 'observability-stack', 'hardened-config']);
+  assertEqual(run.data.repeatable.id, 'capacity-planning');
 });

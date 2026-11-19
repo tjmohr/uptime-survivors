@@ -14,4 +14,5 @@ export const testFiles = [
   './touch-ui.test.js',
   './incidents.test.js',
   './guide.test.js',
+  './upgrades.test.js',
 ];

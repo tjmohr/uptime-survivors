@@ -16,6 +16,13 @@
 | `incident-resolved` | "RESOLVED — {name}" | Same text |
 | `link-down` | — (HUD only) | "{tool} offline" |
 
+**Feature 006 update (2026-11-19):** the two incident messages are no longer timed banners. Each active
+incident has a standing alert line (`#incident-alerts`, below the HUD) reading "MAJOR INCIDENT — {name} —
+{concept}" in pulsing red (no pulse with reduced motion) until it is resolved; then the line turns green,
+"RESOLVED — {name}", for 3 s and is removed. Two active incidents show two lines. The live region still
+announces each message once (after any same-step "Difficulty N" banner); the lines are `aria-hidden`.
+Alerts are cleared when the run ends or the player quits. See `specs/006-late-game-upgrades/spec.md` FR-018.
+
 ## Play field
 
 - Incident drawn with its shape/colour at its radius, a thicker outline, and a slow glow; infected

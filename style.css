@@ -405,3 +405,36 @@ body.touch .guide-tabs [role=tab], body.touch #guide-back { min-height: 44px; mi
   .panel-pause p { margin: 4px 0; }
   .panel-pause .btn-row { margin-top: 8px; gap: 8px; }
 }
+
+/* Late-game upgrades (feature 006): tool-floor note on the level-up screen. */
+.tool-floor { color: var(--warn) !important; margin: 0 0 6px; }
+
+/* Major Incident alerts (feature 006): one line per active incident, pulsing red until resolved;
+   green "RESOLVED" for 3 s afterwards. Below the regular banner spot. */
+.incident-alerts {
+  position: fixed;
+  top: max(calc(22% + 48px), calc(var(--hud-bottom, 0px) + 10px));
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  pointer-events: none;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+}
+.incident-alert {
+  padding: 6px 14px;
+  background: var(--panel);
+  border: 1px solid currentColor;
+  font-size: 16px;
+  font-weight: 600;
+}
+.incident-alert.active { color: var(--bad); animation: incident-pulse 1.2s ease-in-out infinite; }
+.incident-alert.resolved { color: var(--good); }
+@keyframes incident-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@media (prefers-reduced-motion: reduce) { .incident-alert.active { animation: none; } }
+@media (max-width: 600px), (max-height: 500px) {
+  .incident-alert { font-size: 12px; padding: 4px 10px; }
+  .incident-alerts { top: max(calc(22% + 40px), calc(var(--hud-bottom, 0px) + 8px)); gap: 4px; }
+}

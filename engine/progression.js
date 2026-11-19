@@ -65,6 +65,10 @@ export function candidates(run) {
 // The exact stat changes an offer item applies, taken from the same rank tables the engine uses.
 export function describeChange(data, item) {
   if (item.kind === 'heal') return [{ stat: 'uptimeRestorePercent', from: null, to: data.levelUp.fallbackHealPercent }];
+  if (item.kind === 'repeatable') {
+    const p = data.repeatable.damagePercentPerTake;
+    return [{ stat: 'allDamagePercent', from: item.timesTaken * p, to: (item.timesTaken + 1) * p }];
+  }
   if (item.kind === 'tool') {
     const def = data.tools.find((t) => t.id === item.id);
     const to = def.ranks[item.toRank - 1];
@@ -81,24 +85,46 @@ export function describeChange(data, item) {
     .map((k) => ({ stat: k, from: from ? from[k] : 0, to: to[k] }));
 }
 
+// Feature 006 tool floor: the number of tools required at the current difficulty (0 if none).
+export function toolFloorAt(data, difficulty) {
+  let need = 0;
+  for (const f of data.levelUp.toolFloor ?? []) if (f.difficulty <= difficulty) need = f.tools;
+  return need;
+}
+
 export function buildOffer(run) {
-  const pool = candidates(run);
+  let pool = candidates(run);
+  // Below the tool floor (and a new tool exists to take): offer only new tools; flagged for the screen.
+  const newTools = pool.filter((item) => item.kind === 'tool' && item.fromRank === 0);
+  const forced = run.engineer.tools.length < toolFloorAt(run.data, run.difficultyLevel) && newTools.length > 0;
+  if (forced) pool = newTools;
   if (pool.length === 0) {
+    // Everything this run can take is maxed (feature 006): Capacity Planning or Failover.
     const heal = { kind: 'heal', id: 'fallback-heal', fromRank: 0, toRank: 0 };
-    return [{ ...heal, changes: describeChange(run.data, heal) }];
+    const offer = [];
+    if (run.data.repeatable) {
+      const rep = { kind: 'repeatable', id: run.data.repeatable.id, fromRank: 0, toRank: 0, timesTaken: run.engineer.capacityTakes ?? 0 };
+      offer.push({ ...rep, changes: describeChange(run.data, rep) });
+    }
+    offer.push({ ...heal, changes: describeChange(run.data, heal) });
+    return offer;
   }
   const n = Math.min(run.data.levelUp.choices, pool.length);
   for (let i = 0; i < n; i++) {
     const j = i + run.rng.int(pool.length - i);
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  return pool.slice(0, n).map((item) => ({ ...item, changes: describeChange(run.data, item) }));
+  return pool.slice(0, n).map((item) => ({ ...item, changes: describeChange(run.data, item), ...(forced ? { forced: true } : {}) }));
 }
 
 export function applyUpgrade(run, item) {
   const e = run.engineer;
   if (item.kind === 'heal') {
     e.uptime = Math.min(e.maxUptime, e.uptime + (e.maxUptime * run.data.levelUp.fallbackHealPercent) / 100);
+    return;
+  }
+  if (item.kind === 'repeatable') {
+    e.capacityTakes = (e.capacityTakes ?? 0) + 1;
     return;
   }
   const list = item.kind === 'tool' ? e.tools : e.passives;

@@ -108,3 +108,8 @@ For the core-loop milestone (FR-029) the file contains only the core roster (Dro
 Latency Spike, Ping, Firewall Rule, Bandwidth Upgrade) and a 20-row difficulty table that uses
 only those enemies. The same validation rules apply; adding the remaining roster (FR-030) is a
 data edit plus the new behavior/tool kinds in the engine.
+
+**Feature 006 note (2026-11-19):** the roster grew to 7 tools (new kinds `chain`, `aura`, `zone`) and 6
+passives (new stats `cooldownReductionPercent`, `damagePercent`, `telemetryGainPercent`,
+`damageReductionPercent`), plus a top-level `repeatable` (Capacity Planning); `levelUp.fallbackHealPercent`
+is now 15. Rules: `specs/006-late-game-upgrades/data-model.md`.

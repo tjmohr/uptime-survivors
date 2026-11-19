@@ -595,6 +595,15 @@ INCIDENT_LAYOUT = """((insets) => {
   else if (!inside(rect(panel))) bad.push('incident panel outside safe area');
   const buttons = [...document.querySelectorAll('.touch-btn')].map(rect);
   for (const b of buttons) if (overlap(b, rect(panel))) bad.push('panel overlaps a touch button');
+  // Standing incident alerts (feature 006): inside the safe area, clear of the panel and touch buttons.
+  const lines = [...document.querySelectorAll('#incident-alerts .incident-alert')];
+  if (!lines.length) bad.push('no incident alert shown');
+  for (const l of lines) {
+    const r = rect(l);
+    if (!inside(r)) bad.push('incident alert outside safe area');
+    if (!panel.hidden && overlap(r, rect(panel))) bad.push('incident alert overlaps the incident panel');
+    for (const b of buttons) if (overlap(r, b)) bad.push('incident alert overlaps a touch button');
+  }
   const ptrs = __uptimeSurvivors.render.pointers;
   for (const p of ptrs) {
     const pr = { left: p.x - 14, right: p.x + 14, top: p.y - 14, bottom: p.y + 14 };
@@ -607,7 +616,7 @@ INCIDENT_LAYOUT = """((insets) => {
 
 def check_incident_mobile(c, base):
     notes, ok = [], True
-    for size in ((390, 844), (844, 390)):
+    for size in ((360, 640), (640, 360), (390, 844), (844, 390)):
         load(c, base, query="seed=7&levelSeconds=4", size=size)
         insets, how = set_insets(c, size)
         start_by_tap(c)
@@ -621,7 +630,7 @@ def check_incident_mobile(c, base):
         res2 = c.evaluate(INCIDENT_LAYOUT + f"({json.dumps(insets)})")
         bad = res["bad"] + res2["bad"]
         ok &= not bad and res2["pointers"] >= 1
-        notes.append(f"{size[0]}×{size[1]} (safe-area {how}): " + ("panel and pointers inside the safe area, clear of the touch buttons"
+        notes.append(f"{size[0]}×{size[1]} (safe-area {how}): " + ("panel, alert, and pointers inside the safe area, clear of the touch buttons"
                      if not bad else json.dumps(bad)) + f"; pointers while off-screen: {res2['pointers']}")
     # Performance: incident + ~300 enemies, phone size, normal speed and CPU 4× slower.
     load(c, base, query="seed=99&levelSeconds=4", size=PHONE)

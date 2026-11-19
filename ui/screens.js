@@ -3,8 +3,9 @@
 
 import { formatTime } from './hud.js';
 import { createTapGuard } from './tapguard.js';
-import { describeStatChange } from './stattext.js';
-import { problemIcon, loadoutIcon } from './icons.js';
+import { describeStatChange, describeStatWithBonus } from './stattext.js';
+import { effectiveToolStats } from '../engine/stats.js';
+import { problemIcon, loadoutIcon, repeatableIcon } from './icons.js';
 
 export { describeStatChange };
 
@@ -26,6 +27,9 @@ export function createScreens({ touchMode = null } = {}) {
   const overlay = document.getElementById('overlay');
   const live = document.getElementById('live');
   const banner = document.getElementById('banner');
+  const alerts = document.getElementById('incident-alerts');
+  const alertLines = new Map(); // incidentId → element (feature 006 update to 004's banners)
+  const RESOLVED_MS = 3000;
   let current = null;
   let bannerQueue = [];
   let bannerTimer = null;
@@ -143,6 +147,17 @@ export function createScreens({ touchMode = null } = {}) {
   }
   if (touchMode) touchMode.onChange(() => { if (current === 'title' && titleStart) showTitle(titleStart); });
 
+  // Stat lines for an offer; tool stats also show the value after current bonuses (feature 006 FR-015a).
+  function changeText(run, o) {
+    const eff = o.kind === 'tool' ? effectiveToolStats(run, o.id, o.toRank) : null;
+    return o.changes.map((c) => describeStatWithBonus(c, eff ? eff[c.stat] : undefined)).join(' · ');
+  }
+  function offerName(run, o) {
+    if (o.kind === 'heal') return 'Failover';
+    if (o.kind === 'repeatable') return run.data.repeatable.name;
+    return (o.kind === 'tool' ? run.defs.tool : run.defs.passive).get(o.id).name;
+  }
+
   function showLevelUp(run, onChoose) {
     const items = run.offer.map((o, i) => {
       let name;
@@ -152,6 +167,11 @@ export function createScreens({ touchMode = null } = {}) {
         name = 'Failover';
         desc = 'Everything is fully upgraded. Fail over to healthy links to restore Uptime.';
         rank = '';
+      } else if (o.kind === 'repeatable') {
+        const def = run.data.repeatable; // feature 006: Capacity Planning
+        name = def.name;
+        desc = `${def.description} (${def.concept})`;
+        rank = `Taken ${o.timesTaken}×`;
       } else {
         const def = (o.kind === 'tool' ? run.defs.tool : run.defs.passive).get(o.id);
         name = def.name;
@@ -162,13 +182,14 @@ export function createScreens({ touchMode = null } = {}) {
         el('span', {}, el('span', { className: 'key' }, `[${i + 1}] `), el('span', { className: 'name' }, name),
           rank ? el('span', { className: 'rank' }, ` · ${rank}`) : ''),
         el('span', { className: 'desc' }, desc),
-        el('span', { className: 'changes' }, o.changes.map(describeStatChange).join(' · ')));
+        el('span', { className: 'changes' }, changeText(run, o)));
       return el('li', {}, btn);
     });
-    const spoken = `Level ${run.engineer.level}. Choose an upgrade: ` +
-      run.offer.map((o, i) => `${i + 1}, ${o.kind === 'heal' ? 'Failover' : (o.kind === 'tool' ? run.defs.tool : run.defs.passive).get(o.id).name}`).join('; ');
+    const spoken = `Level ${run.engineer.level}. ${run.offer[0]?.forced ? 'Your network needs more tools. ' : ''}Choose an upgrade: ` +
+      run.offer.map((o, i) => `${i + 1}, ${offerName(run, o)}`).join('; ');
     open('levelup', el('div', { className: 'panel' },
       el('h2', {}, `Level up — LVL ${run.engineer.level}`),
+      run.offer[0]?.forced ? el('p', { className: 'tool-floor' }, 'Your network needs more tools: choose one.') : '',
       el('p', {}, 'Choose one (press 1, 2, or 3):'),
       el('ul', { className: 'choices' }, ...items)), spoken);
   }
@@ -221,11 +242,22 @@ export function createScreens({ touchMode = null } = {}) {
       ['guide-tag' + (item.offline ? ' offline' : ''), status],
       ['guide-concept', item.concept],
       ['guide-desc', item.description],
-      ['guide-stats', item.stats.map(describeStatChange).join(' · ')],
-      item.next && item.next.length ? ['guide-next', `Next rank: ${item.next.map(describeStatChange).join(' · ')}`] : null,
+      ['guide-stats', item.stats.map((c) => describeStatWithBonus(c, item.effective?.[c.stat])).join(' · ')],
+      item.next && item.next.length
+        ? ['guide-next', `Next rank: ${item.next.map((c) => describeStatWithBonus(c, item.nextEffective?.[c.stat])).join(' · ')}`] : null,
     ]);
     if (item.offline) node.classList.add('offline');
     return node;
+  }
+
+  function capacityNode(cap) {
+    const status = cap.timesTaken > 0 ? `Taken ${cap.timesTaken}× · All tool damage +${cap.totalPercent}%` : 'Not taken yet';
+    return entry(repeatableIcon(), cap.name, [
+      ['guide-tag', status],
+      ['guide-concept', cap.concept],
+      ['guide-desc', cap.description],
+      ['guide-stats', `Each time: All tool damage +${cap.perTakePercent}%`],
+    ]);
   }
 
   // model: ui/guide.js › buildGuide(run); defs: run.defs (for loadout icons by tool kind).
@@ -239,7 +271,8 @@ export function createScreens({ touchMode = null } = {}) {
       { id: 'tab-loadout', label: 'Tools & passives', render: () => {
         const node = (item) => loadoutNode(item, (item.kind === 'tool' ? defs.tool : defs.passive).get(item.id));
         return [el('h3', {}, 'Tools'), ...model.loadout.filter((x) => x.kind === 'tool').map(node),
-          el('h3', {}, 'Passives'), ...model.loadout.filter((x) => x.kind === 'passive').map(node)];
+          el('h3', {}, 'Passives'), ...model.loadout.filter((x) => x.kind === 'passive').map(node),
+          ...(model.capacity ? [el('h3', {}, 'Repeatable'), capacityNode(model.capacity)] : [])];
       } },
     ];
     const buttons = tabs.map((t) => el('button', { id: t.id, role: 'tab', type: 'button', 'aria-controls': 'guide-list' }, t.label));
@@ -321,6 +354,7 @@ export function createScreens({ touchMode = null } = {}) {
     const loadout = [
       ...e.tools.map((t) => `${run.defs.tool.get(t.id).name} (rank ${t.rank})`),
       ...e.passives.map((p) => `${run.defs.passive.get(p.id).name} (rank ${p.rank})`),
+      ...(e.capacityTakes > 0 ? [`${run.data.repeatable.name} ×${e.capacityTakes}`] : []),
     ].join(', ');
     const stats = el('dl', { className: 'stats' },
       el('dt', {}, 'Outcome'), el('dd', {}, win ? 'Win' : 'Loss'),
@@ -366,10 +400,51 @@ export function createScreens({ touchMode = null } = {}) {
     clearTimeout(bannerTimer);
     bannerTimer = null;
     banner.hidden = true;
+    clearIncidentAlerts();
+  }
+
+  // Major Incident alerts: a pulsing red line per active incident that stays until it is resolved, then
+  // turns green ("RESOLVED — …") for 3 s. Announced once through the live region; the lines themselves
+  // are hidden from screen readers so nothing is read twice.
+  function showIncidentAlert(incidentId, text) {
+    let line = alertLines.get(incidentId);
+    if (!line) {
+      line = el('div', { className: 'incident-alert' });
+      alertLines.set(incidentId, line);
+      alerts.append(line);
+    }
+    clearTimeout(line.timer);
+    line.className = 'incident-alert active';
+    line.textContent = text;
+    announce(text);
+  }
+
+  function resolveIncidentAlert(incidentId, text) {
+    let line = alertLines.get(incidentId);
+    if (!line) {
+      line = el('div', {});
+      alertLines.set(incidentId, line);
+      alerts.append(line);
+    }
+    line.className = 'incident-alert resolved';
+    line.textContent = text;
+    announce(text);
+    clearTimeout(line.timer);
+    line.timer = setTimeout(() => {
+      line.remove();
+      if (alertLines.get(incidentId) === line) alertLines.delete(incidentId);
+    }, RESOLVED_MS);
+  }
+
+  function clearIncidentAlerts() {
+    for (const line of alertLines.values()) clearTimeout(line.timer);
+    alertLines.clear();
+    alerts.replaceChildren();
   }
 
   return {
     get current() { return current; },
     close, announce, showLoading, showError, showTitle, showLevelUp, showPause, showGuide, showEnd, showBanner, clearBanners,
+    showIncidentAlert, resolveIncidentAlert, clearIncidentAlerts,
   };
 }

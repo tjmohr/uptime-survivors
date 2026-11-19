@@ -67,7 +67,7 @@ test('determinism: pause and resume only act in the right phases', async () => {
   assertEqual(run.phase, 'levelup');
 });
 
-const ENGINE_FILES = ['rng', 'content', 'run', 'difficulty', 'spawner', 'behaviors', 'weapons', 'combat', 'incidents',
+const ENGINE_FILES = ['rng', 'content', 'run', 'difficulty', 'spawner', 'behaviors', 'weapons', 'combat', 'incidents', 'stats',
   'progression', 'grid', 'hash'];
 
 test('determinism: engine source uses no Math.random, DOM, or network APIs', async () => {
@@ -141,4 +141,34 @@ test('determinism: run.encountered is identical for identical runs and is hashed
   const before = hashRun(a);
   a.encountered.push('ddos-botnet-test');
   assert(hashRun(a) !== before, 'changing encountered changes the hash');
+});
+
+// Feature 006 (U8): runs with the three new tools are deterministic; the new state is hashed.
+test('determinism: identical runs with Traceroute, Rate Limiter, and Null Route give identical hashes', async () => {
+  const data = await loadGameData();
+  const inputs = recordedInputs(1800);
+  const go = () => {
+    const run = createRun(data, { seed: 21 });
+    run.engineer.tools = ['ping', 'traceroute', 'rate-limiter', 'null-route'].map((id) => ({ id, rank: 3, cooldownLeft: 0 }));
+    for (const input of inputs) {
+      if (run.phase === 'levelup') chooseUpgrade(run, run.tick % run.offer.length);
+      run.engineer.uptime = run.engineer.maxUptime;
+      step(run, input);
+      run.events.length = 0;
+    }
+    return run;
+  };
+  const a = go();
+  const b = go();
+  assertEqual(hashRun(a), hashRun(b));
+  assert(a.slowField !== null, 'slow field active');
+  const h = hashRun(a);
+  a.engineer.capacityTakes += 1;
+  assert(hashRun(a) !== h, 'capacityTakes hashed');
+  a.engineer.capacityTakes -= 1;
+  a.zones.push({ x: 1, y: 2, radius: 3, expiresAt: 4, nextTickAt: 5 });
+  assert(hashRun(a) !== h, 'zones hashed');
+  a.zones.pop();
+  a.slowField = { ...a.slowField, factor: 0.5 };
+  assert(hashRun(a) !== h, 'slow field hashed');
 });

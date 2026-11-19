@@ -160,3 +160,12 @@ test('director: the incident layer is not a level layer (U7)', async () => {
   const audio = await loadAudio();
   for (let l = 1; l <= 20; l++) assert(!layersForLevel(audio, l).some((x) => x.trigger === 'incident'));
 });
+
+// Feature 006 (T040): the new tools sound through the existing effects.
+test('director: Null Route placement plays pulse; a Traceroute chain plays fire (feature 006)', async () => {
+  let d = createDirector(await loadAudio());
+  assertEqual(d.consume([{ type: 'zone-placed', x: 0, y: 0, radius: 60, duration: 2.5 }], 1000).effects, ['pulse']);
+  d = createDirector(await loadAudio());
+  const chainStep = [{ type: 'chain', toolId: 'traceroute', points: [] }, { type: 'fire', toolId: 'traceroute' }];
+  assertEqual(d.consume(chainStep, 1000).effects, ['fire'], 'chain itself is silent; its fire event sounds');
+});

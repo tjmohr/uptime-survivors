@@ -144,15 +144,9 @@ function handleEvents() {
   if (plan.runEnded) audio.stopMusic();
   for (const name of plan.effects) audio.play(name);
   if (plan.runEnded) audio.play(plan.runEnded);
-  // Major Incidents (feature 004): their banner comes before any other banner from the same step.
-  for (const ev of run.events) {
-    if (ev.type !== 'incident-arrived') continue;
-    const def = run.defs.incident.get(ev.incidentId);
-    screens.showBanner(`MAJOR INCIDENT — ${def.name} — ${def.concept}`, true);
-  }
   for (const ev of run.events) {
     if (ev.type === 'incident-resolved') {
-      screens.showBanner(`RESOLVED — ${run.defs.incident.get(ev.incidentId).name}`, true);
+      screens.resolveIncidentAlert(ev.incidentId, `RESOLVED — ${run.defs.incident.get(ev.incidentId).name}`);
     } else if (ev.type === 'link-down') {
       screens.announce(`${run.defs.tool.get(ev.toolId).name} offline`);
     }
@@ -165,11 +159,20 @@ function handleEvents() {
         screens.showBanner(`New threat: ${def.name} — ${def.concept}`, true);
       }
     } else if (ev.type === 'run-ended') {
+      screens.clearIncidentAlerts(); // the end screen reports any incident still active as unresolved
       screens.showEnd(run, {
         onNew: () => startRun(freshSeed()),
         onReplay: () => startRun(state.lastSeed),
       });
     }
+  }
+  // Major Incidents (feature 004; standing alerts since feature 006): a red line stays up until the
+  // incident is resolved, then turns green. After the regular banners, so its announcement is the one
+  // read for that step (the "Difficulty N" banner arrives on the same step).
+  for (const ev of run.events) {
+    if (ev.type !== 'incident-arrived') continue;
+    const def = run.defs.incident.get(ev.incidentId);
+    screens.showIncidentAlert(ev.incidentId, `MAJOR INCIDENT — ${def.name} — ${def.concept}`);
   }
   run.events.length = 0;
   if (run.phase === 'levelup' && screens.current !== 'levelup') screens.showLevelUp(run, choose);
@@ -206,6 +209,8 @@ function pointerInsets() {
   const hud = document.getElementById('hud');
   const hudBottom = hud.hidden ? 0 : hud.getBoundingClientRect().bottom;
   insetCache = { at: now, value: { top: Math.max(px('--sat'), hudBottom), right: px('--sar'), bottom: px('--sab'), left: px('--sal') } };
+  // Incident alerts (feature 006) sit below the HUD, which grows on phones (loadout, touch buttons).
+  document.documentElement.style.setProperty('--hud-bottom', `${Math.round(hudBottom)}px`);
   return insetCache.value;
 }
 

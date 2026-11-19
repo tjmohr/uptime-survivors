@@ -7,6 +7,9 @@ export const TOOL_COLORS = {
   'load-balancer': '#a3e635',
   'firewall-rule': '#22d3ee',
   'ansible-playbook': '#a78bfa',
+  traceroute: '#f472b6', // feature 006
+  'rate-limiter': '#60a5fa',
+  'null-route': '#f43f5e',
 };
 export const LOCKED_COLOR = '#64748b';
 
@@ -71,6 +74,17 @@ const TOOL_ICONS = {
       const y = 8 - Math.cos(a) * 20;
       return `<circle cx="${fmt(x)}" cy="${fmt(y)}" r="3.5" fill="${c}"/>`;
     }).join(''),
+  // Feature 006
+  chain: (c) =>
+    `<polyline points="-14,10 -4,-8 6,6 14,-10" fill="none" stroke="${c}" stroke-width="2"/>` +
+    `<circle cx="-14" cy="10" r="3" fill="${c}"/><circle cx="-4" cy="-8" r="3" fill="${c}"/>` +
+    `<circle cx="6" cy="6" r="3" fill="${c}"/><circle cx="14" cy="-10" r="3" fill="${c}"/>`,
+  aura: (c) =>
+    `<circle cx="0" cy="0" r="15" fill="${c}22" stroke="${c}" stroke-width="2" stroke-dasharray="4 3"/>` +
+    `<circle cx="0" cy="0" r="3.5" fill="${c}"/>`,
+  zone: (c) =>
+    `<circle cx="0" cy="0" r="14" fill="#020617" stroke="${c}" stroke-width="3"/>` +
+    `<circle cx="0" cy="0" r="6" fill="none" stroke="${c}" stroke-width="1.5" stroke-opacity="0.6"/>`,
 };
 
 const PASSIVE_COLOR = '#facc15';
@@ -82,7 +96,31 @@ const PASSIVE_ICONS = {
     `<rect x="-14" y="-12" width="28" height="9" rx="2" fill="${c}33" stroke="${c}" stroke-width="2"/>` +
     `<rect x="-14" y="3" width="28" height="9" rx="2" fill="${c}33" stroke="${c}" stroke-width="2"/>` +
     `<circle cx="9" cy="-7.5" r="1.8" fill="${c}"/><circle cx="9" cy="7.5" r="1.8" fill="${c}"/>`,
+  // Feature 006
+  'qos-policy': (c) =>
+    `<rect x="-14" y="-13" width="28" height="6" rx="1" fill="${c}"/>` +
+    `<rect x="-14" y="-3" width="20" height="6" rx="1" fill="${c}" fill-opacity="0.7"/>` +
+    `<rect x="-14" y="7" width="12" height="6" rx="1" fill="${c}" fill-opacity="0.45"/>`,
+  'link-aggregation': (c) =>
+    `<line x1="-14" y1="-8" x2="4" y2="-8" stroke="${c}" stroke-width="2.5"/>` +
+    `<line x1="-14" y1="0" x2="4" y2="0" stroke="${c}" stroke-width="2.5"/>` +
+    `<line x1="-14" y1="8" x2="4" y2="8" stroke="${c}" stroke-width="2.5"/>` +
+    `<path d="M4,-11 L14,0 L4,11 Z" fill="${c}"/>`,
+  'observability-stack': (c) =>
+    `<path d="M-14,8 A14,14 0 0 1 14,8" fill="none" stroke="${c}" stroke-width="2.5"/>` +
+    `<line x1="0" y1="8" x2="8" y2="-4" stroke="${c}" stroke-width="2.5"/><circle cx="0" cy="8" r="3" fill="${c}"/>`,
+  'hardened-config': (c) =>
+    `<path d="M0,-15 L13,-9 L13,2 C13,9 7,13 0,16 C-7,13 -13,9 -13,2 L-13,-9 Z" fill="${c}33" stroke="${c}" stroke-width="2"/>` +
+    `<polyline points="-6,1 -1,6 7,-5" fill="none" stroke="${c}" stroke-width="2.5"/>`,
 };
+
+// Capacity Planning (feature 006): a stacked-up arrow.
+export function repeatableIcon(size = 40) {
+  const c = '#4ade80';
+  return svg(size, `<rect x="-14" y="6" width="28" height="7" rx="1" fill="${c}55" stroke="${c}" stroke-width="1.5"/>` +
+    `<rect x="-10" y="-3" width="20" height="7" rx="1" fill="${c}55" stroke="${c}" stroke-width="1.5"/>` +
+    `<path d="M0,-16 L8,-7 L-8,-7 Z" fill="${c}"/>`);
+}
 
 // Tool (by its kind, in its play-field colour) or passive (by id, generic circle if unknown).
 export function loadoutIcon(def, size = 40) {

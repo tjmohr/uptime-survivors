@@ -46,12 +46,14 @@ export function createHud(testLabel) {
     els.time.textContent = formatTime(run.elapsed);
 
     const offline = (t) => t.offlineUntil > run.elapsed;
-    const key = [...e.tools.map((t) => `${t.id}:${t.rank}:${offline(t)}`), ...e.passives.map((p) => `${p.id}:${p.rank}`)].join(',');
+    const key = [...e.tools.map((t) => `${t.id}:${t.rank}:${offline(t)}`), ...e.passives.map((p) => `${p.id}:${p.rank}`),
+      e.capacityTakes ?? 0].join(',');
     if (key !== loadoutKey) {
       loadoutKey = key;
       els.loadout.replaceChildren(
         ...e.tools.map((t) => item(run.defs.tool.get(t.id).name, t.rank, offline(t))),
         ...e.passives.map((p) => item(run.defs.passive.get(p.id).name, p.rank)),
+        ...(e.capacityTakes > 0 ? [repeatableItem(run.data.repeatable.name, e.capacityTakes)] : []),
       );
     }
     updateIncidents(run);
@@ -96,6 +98,14 @@ export function createHud(testLabel) {
     } else if (!els.linkWarning.hidden) {
       els.linkWarning.hidden = true;
     }
+  }
+
+  // Capacity Planning (feature 006): times taken instead of rank pips.
+  function repeatableItem(name, n) {
+    const li = document.createElement('li');
+    li.textContent = `${name} ×${n}`;
+    li.setAttribute('aria-label', `${name}, taken ${n} times`);
+    return li;
   }
 
   function item(name, rank, offline = false) {

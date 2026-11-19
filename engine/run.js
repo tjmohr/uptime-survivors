@@ -6,7 +6,7 @@ import { levelAt, runLength, debutsAt } from './difficulty.js';
 import { telemetryToNext, applyDerivedStats, buildOffer, applyUpgrade } from './progression.js';
 import { updateSpawner } from './spawner.js';
 import { updateBehaviors } from './behaviors.js';
-import { updateWeapons } from './weapons.js';
+import { updateWeapons, updateSlowField } from './weapons.js';
 import { moveEngineer, resolveDefeats, applyContactDamage, applyRegen, updatePickups } from './combat.js';
 import { createIncidentRecords, arriveIncidents, updateIncidents } from './incidents.js';
 
@@ -54,9 +54,12 @@ export function createRun(data, { seed = 1, levelSeconds = null } = {}) {
       telemetryToNext: telemetryToNext(data, 1),
       tools: [{ id: p.startingTool, rank: 1, cooldownLeft: 0 }],
       passives: [],
+      capacityTakes: 0, // Capacity Planning taken (feature 006)
     },
     enemies: [],
     encountered: [], // enemy types and incidents met this run, in order (feature 005)
+    zones: [], // Null Route black holes (feature 006)
+    slowField: null, // Rate Limiter field this step (feature 006)
     projectiles: [],
     pickups: [],
     events: [],
@@ -90,6 +93,7 @@ export function step(run, input = { dx: 0, dy: 0 }) {
 
   updateSpawner(run, dt);
   updateIncidents(run, dt);
+  updateSlowField(run); // Rate Limiter: before enemies move (feature 006)
   updateBehaviors(run, dt); // also rebuilds the collision grid
   updateWeapons(run, dt);
   resolveDefeats(run);

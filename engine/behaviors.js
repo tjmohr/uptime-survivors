@@ -43,7 +43,10 @@ export function updateBehaviors(run, dt) {
     // Chase: move straight toward the engineer, stopping at contact.
     const stopAt = enemy.radius + ENGINEER_RADIUS - 2;
     if (d > stopAt) {
-      const stepLen = Math.min(enemy.speed * dt, d - stopAt);
+      // Rate Limiter (feature 006): ordinary enemies inside its field move slower this step.
+      const f = run.slowField;
+      const slow = f && (enemy.x - f.x) ** 2 + (enemy.y - f.y) ** 2 <= (f.radius + enemy.radius) ** 2 ? f.factor : 1;
+      const stepLen = Math.min(enemy.speed * slow * dt, d - stopAt);
       enemy.x += (dx / d) * stepLen;
       enemy.y += (dy / d) * stepLen;
     }

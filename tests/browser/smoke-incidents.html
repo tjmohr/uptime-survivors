@@ -40,7 +40,9 @@ function keepAlive(each = () => {}) {
   }, 20);
 }
 const incident = (id) => R().enemies.find((e) => e.incidentId === id);
-const bannerText = () => doc().getElementById('banner').textContent;
+// Standing incident alerts (feature 006 update): one line per incident.
+const alertLine = (cls) => doc().querySelector(`#incident-alerts .incident-alert.${cls}`);
+const alertText = (cls = 'active') => alertLine(cls)?.textContent ?? '';
 const hudRows = () => [...doc().querySelectorAll('#hud-incidents .incident-row')].map((r) => r.textContent.trim());
 let pass = true;
 const notes = [];
@@ -53,10 +55,12 @@ try {
     keepAlive();
     await until(() => incident('route-leak'), 40000, 'route leak arrives');
     const tArrive = performance.now();
-    await until(() => bannerText().startsWith('MAJOR INCIDENT'), 3000, 'banner');
-    const banner = bannerText();
+    await until(() => alertText().startsWith('MAJOR INCIDENT'), 3000, 'alert');
+    const banner = alertText();
     const pointerAtArrival = G().render.pointers.some((p) => p.kind === 'incident' && p.id === 'route-leak');
-    expect(banner === 'MAJOR INCIDENT — Route Leak — BGP route leak', `banner "${banner}"`);
+    expect(banner === 'MAJOR INCIDENT — Route Leak — BGP route leak', `alert "${banner}"`);
+    const style = W().getComputedStyle(alertLine('active'));
+    expect(style.animationName === 'incident-pulse' && style.color === 'rgb(248, 113, 113)', `red and pulsing (${style.color}, ${style.animationName})`);
     await until(() => doc().getElementById('live').textContent.startsWith('MAJOR INCIDENT'), 1500, 'live region').catch(() => {});
     expect(doc().getElementById('live').textContent.startsWith('MAJOR INCIDENT'), `announced in the live region ("${doc().getElementById('live').textContent}")`);
     await until(() => G().audio.effectCounts.incidentAlarm >= 1, 2000, 'alarm');
@@ -69,6 +73,8 @@ try {
     await sleep(200);
     expect(!G().render.pointers.some((p) => p.kind === 'incident'), 'no pointer once on screen');
     expect(G().audio.incidentMusic === true || G().audio.status !== 'running', `incident music layer on (${G().audio.incidentMusic})`);
+    await sleep(6000); // well past the old 2.6 s banner time
+    expect(alertText() === 'MAJOR INCIDENT — Route Leak — BGP route leak' && incident('route-leak'), 'alert still up while the incident is active (6 s later)');
     results.B1 = { pass, note: notes.join('; ') };
   }
 
@@ -81,8 +87,15 @@ try {
     const inc = incident('route-leak');
     const at = { x: inc.x, y: inc.y };
     inc.health = 0; inc.dead = true;
-    await until(() => bannerText().startsWith('RESOLVED'), 6000, 'resolved banner');
-    expect(bannerText() === 'RESOLVED — Route Leak', `banner "${bannerText()}"`);
+    await until(() => alertText('resolved').startsWith('RESOLVED'), 6000, 'resolved alert');
+    expect(alertText('resolved') === 'RESOLVED — Route Leak', `alert "${alertText('resolved')}"`);
+    const rs = W().getComputedStyle(alertLine('resolved'));
+    expect(rs.color === 'rgb(74, 222, 128)' && rs.animationName === 'none', `green and steady (${rs.color}, ${rs.animationName})`);
+    expect(!alertLine('active'), 'no red line left for the resolved incident');
+    const tResolved = performance.now();
+    await until(() => !alertLine('resolved'), 6000, 'resolved line removed');
+    const shown = performance.now() - tResolved;
+    expect(shown >= 2000 && shown <= 4500, `green line removed after ~3 s (${shown.toFixed(0)} ms)`);
     await until(() => G().audio.effectCounts.incidentResolved >= 1, 2000, 'resolved sound');
     expect(true, 'resolution sound played');
     const reward = R().pickups.find((p) => p.reward);
@@ -139,6 +152,8 @@ try {
     await until(() => incident('core-switch-failure'), 60000, 'second incident');
     await sleep(1500);
     expect(R().enemies.filter((e) => e.incidentId !== undefined).length === 2, 'two incidents active');
+    const lines = [...doc().querySelectorAll('#incident-alerts .incident-alert.active')].map((l) => l.textContent);
+    expect(lines.length === 2 && lines[0].includes('Route Leak') && lines[1].includes('Core Switch Failure'), `two standing alerts ${JSON.stringify(lines)}`);
     expect(hudRows().length === 2, `two HUD bars: ${JSON.stringify(hudRows())}`);
     expect(pointerForSecond, 'pointer shown for the arriving second incident');
     const leakId = incident('route-leak').id;
@@ -167,6 +182,16 @@ try {
     const text = doc().querySelector('.incidents-summary').textContent;
     expect(text === 'Route Leak ✓ resolved · Core Switch Failure ✗ unresolved · Ransomware Outbreak — not reached', `summary "${text}"`);
     results.B5 = { pass, note: notes.join('; ') };
+  }
+  if (mode === 'alertmotion') {
+    // Reduced motion (run with --force-prefers-reduced-motion): the alert is red but does not pulse.
+    await start('/index.html?seed=7&levelSeconds=4');
+    keepAlive();
+    await until(() => alertLine('active'), 40000, 'alert');
+    const st = W().getComputedStyle(alertLine('active'));
+    expect(W().matchMedia('(prefers-reduced-motion: reduce)').matches, 'reduced motion active');
+    expect(st.animationName === 'none' && st.color === 'rgb(248, 113, 113)', `red, no pulse (${st.color}, ${st.animationName})`);
+    results.B7 = { pass, note: notes.join('; ') };
   }
 } catch (err) {
   results.error = String(err && err.stack || err) + ' | so far: ' + notes.join('; ');

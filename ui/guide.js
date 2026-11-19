@@ -3,6 +3,7 @@
 
 import { describeChange } from '../engine/progression.js';
 import { TOOL_KIND_FIELDS, RANK_COUNT } from '../engine/content.js';
+import { effectiveToolStats, repeatableBonus } from '../engine/stats.js';
 
 const byLevel = (key) => (a, b) => a[key] - b[key];
 
@@ -42,6 +43,25 @@ function loadoutEntry(run, def, kind) {
     stats: rankStats(def, kind, rank),
     next: owned && rank < RANK_COUNT ? describeChange(run.data, { kind, id: def.id, fromRank: rank, toRank: rank + 1 }) : null,
     offline: kind === 'tool' && Boolean(owned) && owned.offlineUntil > run.elapsed,
+    // Feature 006: values after passive and Capacity Planning bonuses (owned tools only; null otherwise).
+    effective: kind === 'tool' && owned ? effectiveToolStats(run, def.id, rank) : null,
+    nextEffective: kind === 'tool' && owned && rank < RANK_COUNT ? effectiveToolStats(run, def.id, rank + 1) : null,
+  };
+}
+
+// Capacity Planning (feature 006): times taken and the total all-tool damage bonus.
+function capacityEntry(run) {
+  const def = run.data.repeatable;
+  if (!def) return null;
+  return {
+    id: def.id,
+    kind: 'repeatable',
+    name: def.name,
+    concept: def.concept,
+    description: def.description,
+    timesTaken: run.engineer.capacityTakes ?? 0,
+    totalPercent: repeatableBonus(run),
+    perTakePercent: def.damagePercentPerTake,
   };
 }
 
@@ -55,5 +75,5 @@ export function buildGuide(run) {
     ...data.tools.map((d) => loadoutEntry(run, d, 'tool')),
     ...data.passives.map((d) => loadoutEntry(run, d, 'passive')),
   ];
-  return { problems, incidents, loadout };
+  return { problems, incidents, loadout, capacity: capacityEntry(run) };
 }

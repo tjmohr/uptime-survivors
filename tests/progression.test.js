@@ -51,16 +51,17 @@ test('progression: max-rank items are never offered', async () => {
   }
 });
 
-test('progression: the fallback heal is offered when nothing is left', async () => {
+test('progression: when nothing is left, Capacity Planning and the fallback heal are offered (feature 006)', async () => {
   const run = await quietRun();
   maxAll(run);
   run.engineer.uptime = 10;
   const offer = buildOffer(run);
-  assertEqual(offer.map((o) => o.kind), ['heal']);
+  assertEqual(offer.map((o) => o.kind), ['repeatable', 'heal']);
+  assertEqual(run.data.levelUp.fallbackHealPercent, 15);
   run.phase = 'levelup';
   run.pendingLevelUps = 1;
   run.offer = offer;
-  chooseUpgrade(run, 0);
+  chooseUpgrade(run, 1);
   assertEqual(run.engineer.uptime, 10 + run.engineer.maxUptime * run.data.levelUp.fallbackHealPercent / 100);
 });
 

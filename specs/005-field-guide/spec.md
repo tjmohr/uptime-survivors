@@ -91,6 +91,8 @@ match the game's own values.
 
 1. **Given** the Field Guide is open, **When** the player switches to "Tools & passives", **Then** each
    of the 4 tools and 2 passives is listed with an icon, name, real networking concept, and description.
+   (Feature 006 note: now every tool and passive — 7 and 6 — plus a Capacity Planning entry; owned tools also
+   show values after bonuses. See `specs/006-late-game-upgrades/spec.md` FR-015, FR-015a.)
 2. **Given** the player owns a tool or passive, **When** its entry is shown, **Then** it shows the
    current rank (out of 5) and every stat at that rank, using the same numbers and wording as the
    level-up screen.

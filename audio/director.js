@@ -15,6 +15,7 @@ const EVENT_TO_EFFECT = {
   'enemy-defeated': 'defeat',
   pickup: 'pickup',
   'level-up': 'levelUp',
+  'zone-placed': 'pulse', // Null Route (feature 006); Traceroute and the other tools emit 'fire' or 'hit'
 };
 
 // data-model.md › AudioState.bpm: linear from bpmStart (level 1) to bpmEnd (level 20).

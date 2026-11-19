@@ -74,6 +74,8 @@ export function createRenderer(canvas, data, { showFps = false, getInsets = () =
   let scale = 1;
   let particles = [];
   let rings = [];
+  let chains = []; // Traceroute paths (feature 006), visual only
+  let drawn = { chains: 0, zones: 0, aura: false }; // for automated checks
   let flash = 0;
   let shake = 0;
   let quality = 0;
@@ -192,6 +194,8 @@ export function createRenderer(canvas, data, { showFps = false, getInsets = () =
         }
       } else if (ev.type === 'pulse') {
         rings.push({ x: ev.x, y: ev.y, r: ev.radius, life: 0.35 });
+      } else if (ev.type === 'chain') {
+        chains.push({ points: ev.points, life: 0.2 });
       } else if (ev.type === 'player-hit' && !reduced()) {
         flash = 0.25;
         shake = 0.15;
@@ -249,6 +253,31 @@ export function createRenderer(canvas, data, { showFps = false, getInsets = () =
     }
 
     // Enemies; Major Incidents get their own look, infected enemies a magenta ring (feature 004).
+    // Null Route black holes (feature 006): dark disc with a rim, under the enemies.
+    drawn = { chains: 0, zones: 0, aura: false };
+    const nrColor = TOOL_COLORS['null-route'];
+    for (const z of run.zones ?? []) {
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.75)';
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = nrColor;
+      ctx.globalAlpha = reduced() ? 0.9 : 0.6 + 0.3 * Math.sin((performance.now() / 300) * Math.PI);
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      drawn.zones++;
+    }
+    // Rate Limiter field (feature 006): a faint dashed ring around the engineer while online.
+    if (run.slowField) {
+      ctx.strokeStyle = TOOL_COLORS['rate-limiter'];
+      ctx.globalAlpha = 0.45;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath(); ctx.arc(e.x, e.y, run.slowField.radius, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      drawn.aura = true;
+    }
+
     for (const n of run.enemies) {
       if (n.incidentId !== undefined) {
         const def = incidentDefs.get(n.incidentId);
@@ -282,6 +311,18 @@ export function createRenderer(canvas, data, { showFps = false, getInsets = () =
       ctx.arc(r.x, r.y, reduced() ? r.r : r.r * (1.15 - 0.15 * t), 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 1;
+    }
+
+    // Traceroute paths (feature 006): a bright polyline through each hop, fading out (no fade when reduced).
+    for (const c of chains) {
+      ctx.strokeStyle = TOOL_COLORS.traceroute;
+      ctx.globalAlpha = reduced() ? 1 : Math.max(0, c.life / 0.2);
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      c.points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      drawn.chains++;
     }
 
     // Orbiting Firewall Rule barriers, linked to the engineer like a diagram
@@ -335,6 +376,8 @@ export function createRenderer(canvas, data, { showFps = false, getInsets = () =
     particles = particles.filter((p) => p.life > 0);
     for (const r of rings) r.life -= dt;
     rings = rings.filter((r) => r.life > 0);
+    for (const c of chains) c.life -= dt;
+    chains = chains.filter((c) => c.life > 0);
     flash = Math.max(0, flash - dt);
     shake = Math.max(0, shake - dt);
 
@@ -361,7 +404,7 @@ export function createRenderer(canvas, data, { showFps = false, getInsets = () =
     particles: particles.length, rings: rings.length, flash, shake, reducedMotion: motionQuery.matches, scale,
     viewScale: viewScale(w, h), viewHalfShort: viewHalfShort(w, h), width: w, height: h,
     canvasWidth: canvas.width, canvasHeight: canvas.height, quality, resizes, frames: frameSummary(),
-    pointers: pointers.map((p) => ({ ...p })), rewardDrawRadius,
+    pointers: pointers.map((p) => ({ ...p })), rewardDrawRadius, drawn: { ...drawn },
   });
 
   return { draw, handleEvents, resize, stats };

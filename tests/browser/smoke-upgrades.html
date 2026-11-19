@@ -1,0 +1,212 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>smoke-upgrades</title></head>
+<body>
+<iframe id="f" width="1280" height="800"></iframe>
+<script type="module">
+// Scripted late-game upgrade checks B1–B3 (specs/006-late-game-upgrades/quickstart.md), run by drive.py.
+import { effectiveToolStats } from '/engine/stats.js';
+import { describeStatWithBonus as describeStatChange } from '/ui/stattext.js';
+import { buildGuide } from '/ui/guide.js';
+
+const mode = new URLSearchParams(location.search).get('mode');
+const results = { mode };
+const frame = document.getElementById('f');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const W = () => frame.contentWindow;
+const G = () => W().__uptimeSurvivors;
+const R = () => G().run;
+const doc = () => frame.contentDocument;
+const $ = (sel) => doc().querySelector(sel);
+const $$ = (sel) => [...doc().querySelectorAll(sel)];
+const key = (code, k = code) => {
+  const target = doc().activeElement || doc().body;
+  target.dispatchEvent(new (W().KeyboardEvent)('keydown', { code, key: k, bubbles: true, cancelable: true }));
+  target.dispatchEvent(new (W().KeyboardEvent)('keyup', { code, key: k, bubbles: true }));
+};
+async function until(fn, ms = 20000, label = '') {
+  const t0 = performance.now();
+  while (performance.now() - t0 < ms) { try { if (fn()) return true; } catch {} await sleep(15); }
+  throw new Error('timeout: ' + label);
+}
+async function start(url) {
+  const loaded = new Promise((r) => frame.addEventListener('load', r, { once: true }));
+  frame.src = url;
+  await loaded;
+  await until(() => doc()?.querySelector('#overlay button') && G() && G().audio, 10000, 'title');
+  doc().querySelector('#overlay button').click();
+  await until(() => R()?.phase === 'playing', 3000, 'start');
+}
+let keeper = null;
+function keepAlive(each = () => {}) {
+  clearInterval(keeper);
+  keeper = setInterval(() => {
+    const run = R();
+    if (!run) return;
+    run.engineer.maxUptime = 1e12; run.engineer.uptime = 1e12;
+    each(run);
+  }, 20);
+}
+async function forceLevelUp() {
+  const { addTelemetry } = await import('/engine/progression.js');
+  const r = R();
+  addTelemetry(r, r.engineer.telemetryToNext - r.engineer.telemetry);
+  await until(() => R().phase === 'levelup' && $$('#overlay .choice').length > 0, 5000, 'level-up screen');
+}
+const choices = () => $$('#overlay .choice');
+let pass = true;
+const notes = [];
+const expect = (cond, text) => { notes.push(`${cond ? 'ok' : 'FAIL'} ${text}`); pass &&= !!cond; };
+
+try {
+  if (mode === 'tools') {
+    // B1: each new tool draws its effect, resolves problems, and sounds.
+    await start('/index.html?seed=31&levelSeconds=6');
+    const seen = { chains: 0, zones: 0, aura: 0 };
+    keepAlive((run) => {
+      if (run.phase === 'levelup') key('Digit1', '1');
+      const d = G().render.drawn;
+      if (d) { seen.chains = Math.max(seen.chains, d.chains); seen.zones = Math.max(seen.zones, d.zones); if (d.aura) seen.aura++; }
+    });
+    const run = R();
+    run.engineer.tools = ['traceroute', 'rate-limiter', 'null-route'].map((id) => ({ id, rank: 3, cooldownLeft: 0 }));
+    const fire0 = G().audio.effectCounts.fire ?? 0;
+    const pulse0 = G().audio.effectCounts.pulse ?? 0;
+    const hit0 = G().audio.effectCounts.hit ?? 0;
+    const defeated0 = run.stats.enemiesDefeated;
+    await until(() => R().difficultyLevel >= 3 && seen.chains > 0 && seen.zones > 0 && seen.aura > 0, 30000, 'all three drawn');
+    await sleep(5000); // keep playing with only the new tools
+    expect(seen.chains > 0, `Traceroute path drawn (${seen.chains} at once)`);
+    expect(seen.zones > 0, `Null Route zone drawn (${seen.zones} at once)`);
+    expect(seen.aura > 0, 'Rate Limiter ring drawn');
+    expect(R().stats.enemiesDefeated - defeated0 >= 10, `${R().stats.enemiesDefeated - defeated0} problems resolved by the new tools`);
+    const c = G().audio.effectCounts;
+    const st = G().audio.status;
+    expect(st !== 'running' || ((c.fire ?? 0) > fire0 && (c.pulse ?? 0) > pulse0 && (c.hit ?? 0) > hit0),
+      `sounds (status ${st}): fire +${(c.fire ?? 0) - fire0}, pulse +${(c.pulse ?? 0) - pulse0}, hit +${(c.hit ?? 0) - hit0}`);
+    results.B1 = { pass, note: notes.join('; ') };
+  }
+
+  if (mode === 'levelup') {
+    // B2: tool choices show "(… with bonuses)" equal to effectiveToolStats; exhausted pool → 2 choices.
+    await start('/index.html?seed=8');
+    keepAlive();
+    const run = R();
+    run.engineer.passives = [{ id: 'link-aggregation', rank: 2 }, { id: 'qos-policy', rank: 1 }];
+    let checked = 0;
+    for (let attempt = 0; attempt < 12 && checked === 0; attempt++) {
+      await forceLevelUp();
+      R().offer.forEach((o, i) => {
+        if (o.kind !== 'tool') return;
+        const eff = effectiveToolStats(R(), o.id, o.toRank);
+        const want = o.changes.map((ch) => describeStatChange(ch, eff[ch.stat])).join(' · ');
+        const got = choices()[i].querySelector('.changes').textContent;
+        expect(got === want && /with bonuses/.test(got), `${o.id} "${got}"`);
+        checked++;
+      });
+      key('Digit1', '1');
+      await until(() => R().phase !== 'levelup' || R().pendingLevelUps > 0, 3000, 'chosen');
+      await sleep(50);
+    }
+    expect(checked > 0, `${checked} tool choices checked`);
+    // Tool floor: at difficulty 5 with one tool, the offer is only new tools, with the note on screen.
+    await until(() => R().phase === 'playing', 3000, 'playing before floor');
+    R().engineer.tools = [{ id: 'ping', rank: 1, cooldownLeft: 0 }];
+    R().difficultyLevel = 5;
+    await forceLevelUp();
+    const note = $('#overlay .tool-floor');
+    expect(note && note.textContent === 'Your network needs more tools: choose one.', `tool-floor note "${note && note.textContent}"`);
+    expect(R().offer.length === 3 && R().offer.every((o) => o.kind === 'tool' && o.fromRank === 0) && choices().every((b) => /New/.test(b.textContent)),
+      `floor offer: ${R().offer.map((o) => o.id).join(', ')}`);
+    key('Digit1', '1');
+    await until(() => R().phase === 'playing' || R().pendingLevelUps > 0, 3000, 'floor chosen');
+    expect(R().engineer.tools.length === 2, 'a second tool taken');
+
+    // Exhaust the pool.
+    const r = R();
+    r.engineer.tools = ['ping', 'traceroute', 'rate-limiter', 'null-route'].map((id) => ({ id, rank: 5, cooldownLeft: 0 }));
+    r.engineer.passives = r.data.passives.map((p) => ({ id: p.id, rank: 5 }));
+    await until(() => R().phase === 'playing', 3000, 'playing');
+    await forceLevelUp();
+    const list = choices();
+    const texts = list.map((b) => b.textContent);
+    expect(list.length === 2, `${list.length} choices when everything is maxed`);
+    expect(/Capacity Planning/.test(texts[0]) && /Taken 0×/.test(texts[0]) && /All tool damage \+0% → \+5%/.test(texts[0]), `[1] ${texts[0]}`);
+    expect(/Failover/.test(texts[1]) && /Restore Uptime \+15%/.test(texts[1]), `[2] ${texts[1]}`);
+    key('Digit1', '1');
+    await until(() => R().engineer.capacityTakes === 1, 3000, 'taken');
+    expect(true, 'key 1 takes Capacity Planning');
+    results.B2 = { pass, note: notes.join('; ') };
+  }
+
+  if (mode === 'guide') {
+    // B3: Field Guide lists 7 tools, 6 passives, Capacity Planning; effective values; HUD ×n.
+    await start('/index.html?seed=4');
+    const run = R();
+    run.engineer.tools = [{ id: 'ping', rank: 2, cooldownLeft: 0 }, { id: 'null-route', rank: 1, cooldownLeft: 0 }];
+    run.engineer.passives = [{ id: 'link-aggregation', rank: 1 }];
+    run.engineer.capacityTakes = 2;
+    await sleep(300);
+    const hud = $$('#hud-loadout li').map((li) => li.textContent);
+    expect(hud.includes('Capacity Planning ×2') && hud.some((t) => t.startsWith('Null Route')) && hud.some((t) => t.startsWith('Link Aggregation')),
+      `HUD loadout ${JSON.stringify(hud)}`);
+    key('Escape');
+    await until(() => R().phase === 'paused' && $('#open-guide'), 3000, 'paused');
+    $('#open-guide').click();
+    await until(() => $('#tab-loadout'), 3000, 'guide');
+    $('#tab-loadout').click();
+    await until(() => $('[role=tab][aria-selected=true]').id === 'tab-loadout', 2000, 'tab');
+    const entries = $$('#guide-list .guide-entry');
+    expect(entries.length === 14, `${entries.length} entries (7 tools + 6 passives + Capacity Planning)`);
+    const cap = entries[entries.length - 1];
+    expect(cap.querySelector('.guide-name').textContent === 'Capacity Planning' && cap.textContent.includes('Taken 2× · All tool damage +10%'),
+      `Capacity Planning entry: ${cap.textContent.slice(0, 120)}`);
+    const model = buildGuide(R());
+    const ping = model.loadout.find((e) => e.id === 'ping');
+    const want = ping.stats.map((c) => describeStatChange(c, ping.effective[c.stat])).join(' · ');
+    const got = entries[0].querySelector('.guide-stats').textContent;
+    expect(got === want && /with bonuses/.test(got), `Ping stats "${got}"`);
+    const names = entries.map((a) => a.querySelector('.guide-name').textContent);
+    for (const n of ['Traceroute', 'Rate Limiter', 'Null Route', 'QoS Policy', 'Link Aggregation', 'Observability Stack', 'Hardened Config']) {
+      expect(names.includes(n), `${n} listed`);
+    }
+    expect($$('#guide-list svg').length === 14 && $$('#guide-list svg').every((s) => s.getAttribute('aria-hidden') === 'true'), 'every entry has a decorative icon');
+    results.B3 = { pass, note: notes.join('; ') };
+  }
+  if (mode === 'perf') {
+    // B4 (performance part): 300 enemies with all three new tools at rank 5, frame pacing for 5 s.
+    const { spawnEnemy } = await import('/engine/spawner.js');
+    const { rowFor } = await import('/engine/difficulty.js');
+    await start('/index.html?seed=99');
+    keepAlive((run) => { if (run.phase === 'levelup') key('Digit1', '1'); });
+    const run = R();
+    run.engineer.tools = ['ping', 'traceroute', 'rate-limiter', 'null-route'].map((id) => ({ id, rank: 5, cooldownLeft: 0 }));
+    const row = rowFor(run.data, 20);
+    const ids = run.data.enemies.map((e) => e.id);
+    for (let i = 0; i < 300; i++) {
+      const a = (i / 300) * Math.PI * 2 * 7;
+      const r = 80 + (i % 40) * 14;
+      const e = spawnEnemy(run, ids[i % ids.length], Math.cos(a) * r, Math.sin(a) * r, row);
+      e.health = e.maxHealth = 1e9;
+    }
+    await sleep(500);
+    const frames = [];
+    await new Promise((resolve) => {
+      let last = null;
+      const t0 = W().performance.now();
+      const tick = (t) => { if (last !== null) frames.push(t - last); last = t; if (t - t0 < 5000) W().requestAnimationFrame(tick); else resolve(); };
+      W().requestAnimationFrame(tick);
+    });
+    const sorted = [...frames].sort((a, b) => a - b);
+    const avg = frames.reduce((x, y) => x + y, 0) / frames.length;
+    const p95 = sorted[Math.floor(sorted.length * 0.95)];
+    expect(1000 / avg >= 50 && R().phase === 'playing',
+      `${R().enemies.length} enemies, ${R().zones.length} zones, field ${R().slowField ? 'on' : 'off'}: avg ${avg.toFixed(1)} ms (${(1000 / avg).toFixed(0)} fps), p95 ${p95.toFixed(1)} ms`);
+    results.B4perf = { pass, note: notes.join('; ') };
+  }
+} catch (err) {
+  results.error = String(err && err.stack || err) + ' | so far: ' + notes.join('; ');
+}
+clearInterval(keeper);
+fetch('/__result?d=' + encodeURIComponent(JSON.stringify(results))).catch(() => {});
+</script>
+</body></html>

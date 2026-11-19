@@ -14,8 +14,11 @@ export function hashRun(run) {
   const parts = [
     run.tick, run.rng.state(), run.phase, run.outcome, run.difficultyLevel, run.pendingLevelUps,
     e.x, e.y, e.uptime, e.maxUptime, e.level, e.telemetry, e.invulnerableUntil,
-    e.tools.map((t) => `${t.id}:${t.rank}:${t.cooldownLeft}:${t.offlineUntil || 0}`).join('|'),
+    e.tools.map((t) => `${t.id}:${t.rank}:${t.cooldownLeft}:${t.offlineUntil || 0}:${t.tickLeft ?? ''}`).join('|'),
     e.passives.map((p) => `${p.id}:${p.rank}`).join('|'),
+    e.capacityTakes ?? 0,
+    (run.zones ?? []).map((z) => `${z.x}:${z.y}:${z.radius}:${z.expiresAt}:${z.nextTickAt}`).join('|'),
+    run.slowField ? `${run.slowField.x}:${run.slowField.y}:${run.slowField.radius}:${run.slowField.factor}` : '',
     run.enemies.map((n) => `${n.id}:${n.typeId}:${n.x}:${n.y}:${n.health}:${n.infected ? 1 : 0}` +
       (n.incidentId !== undefined ? `:${n.phase}:${n.timer}:${n.linkState}:${n.pendingTool}` : '')).join('|'),
     run.projectiles.map((p) => `${p.x}:${p.y}:${p.pierceLeft}`).join('|'),

@@ -3,7 +3,8 @@
 A browser survivors-like (auto-attacking horde survival) with a network-engineering theme. You
 play the network engineer. Network problems — dropped packets, latency spikes, broadcast storms,
 route flaps, DDoS botnets — swarm in from every side. You only steer; your tools (Ping, Firewall
-Rules, Ansible Playbooks, Load Balancers) fire on their own. Defeated problems drop telemetry,
+Rules, Ansible Playbooks, Load Balancers, Traceroute, Rate Limiters, Null Routes — carry up to four) fire
+on their own. Defeated problems drop telemetry,
 which levels you up and lets you pick a new tool or upgrade. Difficulty climbs through 20
 one-minute levels; keep the network's **Uptime** above 0% until the end of level 20 to win.
 
@@ -38,6 +39,8 @@ Testing URLs:
 - **Terminal**: `node tests/run.mjs` (Node 18+), or on macOS without Node:
   `/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc -m tests/run.mjs`.
   Both exit with code 0 only if every test passes; zero tests found counts as a failure.
+- **Late-game upgrade balance** (feature 006): `python3 tests/balance/parallel.py upgrades s1` (also `s2`, `s3`,
+  `s4`) runs the seeds in parallel; `jsc -m tests/balance/upgrades.mjs -- s1 23` runs one seed.
 - **Incident balance simulation** (slow: 10 full seeded runs): `jsc -m tests/balance/incidents.mjs -- s1`
   (resolve times and rewards) or `-- s2` (difficulty with vs. without incidents); add a seed (`-- s1 83`)
   to run one seed, e.g. several in parallel.
@@ -80,8 +83,9 @@ any other device as soon as its screen is touched; desktops that are never touch
 ## Major Incidents
 
 Three times per run a **Major Incident** — a single, much larger enemy themed on a real network
-incident — arrives with a "MAJOR INCIDENT" banner, an alarm, and a health bar in the HUD (plus an
-arrow at the screen edge while it is off-screen):
+incident — arrives with an alarm, a health bar in the HUD, an arrow at the screen edge while it is
+off-screen, and a pulsing red "MAJOR INCIDENT" alert that stays on screen until you resolve it; then the
+alert turns green ("RESOLVED") for a few seconds:
 
 | Level | Incident | Real concept | What it does |
 |-------|----------|--------------|--------------|
@@ -105,12 +109,38 @@ icons you see on the play field:
   behind it, and a description. Problems you have not met yet in this run are **locked** ("???", a grey
   outline, "Not yet encountered"); an entry unlocks as soon as that problem enters the game (even
   off-screen), and every new run starts locked again. Nothing is saved between runs.
-- **Tools & passives**: all four tools and both passives with their concept and description. Owned ones
+- **Tools & passives**: every tool and passive (7 and 6) plus Capacity Planning, with their concept and description. Owned ones
   show their rank (of 5), the exact stats the game is using at that rank, and a **Next rank** line with
   only the stats that would change — the same numbers and wording as the level-up screen. Unowned ones
   say "Not owned" and show rank 1; a tool knocked out by Core Switch Failure says **OFFLINE**.
 
 The game stays paused the whole time, and opening the guide changes nothing in the run.
+
+## Late-game upgrades
+
+You can carry **4 tools** out of 7, so each run is a build choice (every run starts with Ping). Six
+passives shape the build, and once everything your run can still take is maxed, every level-up offers
+**Capacity Planning** or **Failover** — never a dead level-up.
+
+| Kind | Name | Real concept | What it does |
+|------|------|--------------|--------------|
+| Tool | **Traceroute** | Hop-by-hop path discovery | A bolt hits the nearest problem, then hops to further ones |
+| Tool | **Rate Limiter** | Traffic policing | A field around you that slows problems (never Major Incidents) and wears them down |
+| Tool | **Null Route** | Black-hole routing (RTBH) | A black hole on the densest cluster that damages everything inside for a few seconds |
+| Passive | **QoS Policy** | Quality of Service | Shorter cooldowns for every tool (10–25%) |
+| Passive | **Link Aggregation** | Link aggregation (LACP) | More damage from every tool (12–30%) |
+| Passive | **Observability Stack** | Monitoring and observability | More telemetry from every pickup (15–40%) |
+| Passive | **Hardened Config** | Device hardening | Less Uptime lost on contact (10–25%) |
+| Repeatable | **Capacity Planning** | Capacity planning | +5% damage to all tools each time, no limit |
+
+**Tool floor:** from difficulty 5 you need 2 tools, from 10 three, and from 15 four. If you are below
+that, the level-up offers only new tools ("Your network needs more tools: choose one."), so a run never
+drifts into passives with only Ping. The new passives are strongest early on (e.g. Link Aggregation
++12% at rank 1), so an early passive pick still pays off.
+
+Failover now restores 15% of maximum Uptime (was 20%). Wherever a tool's numbers are shown (level-up,
+Field Guide) a bonus from passives or Capacity Planning appears next to the rank value, e.g.
+"Damage 12 (13.92 with bonuses)" — the same number the game uses.
 
 ## Sound
 
@@ -134,7 +164,7 @@ or unavailable. Every sounded event keeps its visual feedback.
 
 ## Status
 
-First playable is built: all 5 enemies, 4 tools, 2 passives, and 20 difficulty levels, plus
+First playable is built: all 5 enemies, 7 tools, 6 passives, Capacity Planning, and 20 difficulty levels, plus
 synthesized sound effects and music (feature 002). Automated and scripted-browser checks pass (see
 Verification), and touch play on phones and tablets (feature 003) is checked in emulated phones with
 real touch input. **Still outstanding:** a human playthrough, checks on real phones (feature 003
@@ -154,6 +184,9 @@ checks.
   cannot judge how it sounds. Nobody has listened to the sound yet (H1–H3 not run).
 - With `?levelSeconds=2`, difficulty rises 30× faster than levelling, so those runs usually end in a
   loss; use `?levelSeconds=0.5` to see the win screen quickly.
+- Late-game upgrades (feature 006): balance was tuned with scripted bots only (tool floor and front-loaded passives
+  came out of that); whether the tool floor feels forced, and whether the game is now too easy for strong
+  players, needs the playtest (L-H2).
 - Major Incidents balance: in simulation, incidents make strong late-game runs much harder (I-S2) — an
   open balance question. (An ignored incident used to halve spawning for as long as it lived; since
   2026-11-19 the half rate applies only during its arrival level.)
@@ -172,7 +205,8 @@ Scenarios are defined in
 (A, B, H rows: sound), and [`specs/003-mobile-touch/quickstart.md`](specs/003-mobile-touch/quickstart.md)
 (U, T, and "Phone H" rows: touch and mobile), and [`specs/004-major-incidents/quickstart.md`](specs/004-major-incidents/quickstart.md)
 ("I-" rows: Major Incidents), and [`specs/005-field-guide/quickstart.md`](specs/005-field-guide/quickstart.md)
-(G, GB, GH rows: Field Guide). A checked task box is not evidence; this table is. Unrun checks stay visible
+(G, GB, GH rows: Field Guide), and [`specs/006-late-game-upgrades/quickstart.md`](specs/006-late-game-upgrades/quickstart.md)
+("L-" rows: late-game upgrades). A checked task box is not evidence; this table is. Unrun checks stay visible
 as "not run". M1/F1 record the test count when feature 001 was verified; the current count is in A1–A5.
 
 | # | Check | Result | Date | Environment | Evidence / notes |
@@ -246,15 +280,16 @@ as "not run". M1/F1 record the test count when feature 001 was verified; the cur
 | I-U5 | Lingering and overlap | pass | 2026-11-19 | jsc | Unresolved incident keeps its arrival strength; two active at once; ordinary spawning × 0.5 only while an incident is active during its arrival level (not compounded); full rate once that level ends or it is resolved. |
 | I-U6 | Run integrity | pass | 2026-11-19 | jsc | Full 20-level run (short levels) still ends in a win at `runLength` with all incidents reached; same seed + inputs → identical hash; pause/level-up freeze incidents. 133/133 tests pass. |
 | I-U7 | Incident sound | pass | 2026-11-19 | jsc | 12 effects validated; incident layer rules (`trigger` xor `joinLevel`, exactly one); alarm/resolution always play even with 8 effects sounding; incident-active flag. |
-| I-S1 | Resolve time and reward (SC-002) | pass | 2026-11-19 | `tests/balance/incidents.mjs`, 10 seeds, "focused play" bot (circles ~150 u from the incident), invincible, first upgrade each level-up | Route Leak 28–67 s, 8/10 in 30–60 s, reward ≈ 0.77–0.89 level-ups; Core Switch Failure 32–49 s, 10/10, ≈ 0.90–1.05; Ransomware Outbreak 46–55 s, 10/10, ≈ 1.00–1.13. Data: health 1200 / 2600 / 3400, rewards 72 / 160 / 260; softened 2026-11-19 (contact damage 30 / 35 / 45 per s; Ransomware infection radius 140, ×1.25 health, ×1.15 speed). A plain circling bot outran the incidents and resolved none, so "focused play" is part of this measurement. |
-| I-S2 | Difficulty with incidents (SC-003 proxy) | **fail** | 2026-11-19 | Same simulation, not invincible | Median end level unchanged (7 vs 7), but the 4 seeds that win without incidents all lose with them (end levels 18, 5, 7, 12, 18, 18, 6, 5, 6, 7 vs 20, 5, 7, 20, 20, 20, 6, 5, 6, 7). Tracing a loss showed the bot dying to the ordinary (partly infected) horde while circling the incident at close range with a fully maxed build — not to the incident itself: softening the incidents changed no outcome, a wider 260 u orbit stopped the bot resolving incidents at all (tools aim at the nearest enemy, so the horde shields the incident), and making projectile tools aim at incidents first (tried, then reverted) did not restore any win. So this proxy mostly measures the bot's tactics; the ≥ 7/10-in-7–14 rule also fails for the baseline (2/10). Needs a human playtest (I-H2). |
-| I-B1 | Arrival in the browser | pass | 2026-11-19 | Chrome 157 headless, `?levelSeconds=4` | Banner "MAJOR INCIDENT — Route Leak — BGP route leak", live-region announcement, alarm, HUD bar, edge pointer while off-screen, fully on screen ~1.7 s after arrival, incident music layer on. |
+| I-S1 | Resolve time and reward (SC-002) | pass (re-run 2026-11-19) | 2026-11-19 | `tests/balance/incidents.mjs`, 10 seeds, "focused play" bot (circles ~150 u from the incident), invincible, first upgrade each level-up | Route Leak 28–67 s, 8/10 in 30–60 s, reward ≈ 0.77–0.89 level-ups; Core Switch Failure 32–49 s, 10/10, ≈ 0.90–1.05; Ransomware Outbreak 46–55 s, 10/10, ≈ 1.00–1.13. Data: health 1200 / 2600 / 3400, rewards 72 / 160 / 260; softened 2026-11-19 (contact damage 30 / 35 / 45 per s; Ransomware infection radius 140, ×1.25 health, ×1.15 speed). A plain circling bot outran the incidents and resolved none, so "focused play" is part of this measurement. **Re-run 2026-11-19 with feature 006 content (final: tool floor + front-loaded passives): pass** — Route Leak 10/10, Core Switch Failure 8/10, Ransomware Outbreak 7/10 resolved in 30–60 s; rewards ≈ 0.68–1.07 level-ups. (With the starting feature 006 values Core Switch Failure fell to 4/10; the balance changes recorded under L-S4 fixed it.) |
+| I-S2 | Difficulty with incidents (SC-003 proxy) | **fail** | 2026-11-19 | Same simulation, not invincible | Median end level unchanged (7 vs 7), but the 4 seeds that win without incidents all lose with them (end levels 18, 5, 7, 12, 18, 18, 6, 5, 6, 7 vs 20, 5, 7, 20, 20, 20, 6, 5, 6, 7). Tracing a loss showed the bot dying to the ordinary (partly infected) horde while circling the incident at close range with a fully maxed build — not to the incident itself: softening the incidents changed no outcome, a wider 260 u orbit stopped the bot resolving incidents at all (tools aim at the nearest enemy, so the horde shields the incident), and making projectile tools aim at incidents first (tried, then reverted) did not restore any win. So this proxy mostly measures the bot's tactics; the ≥ 7/10-in-7–14 rule also fails for the baseline (2/10). Needs a human playtest (I-H2). **Re-run 2026-11-19 with feature 006 content:** still fail — with incidents 18, 7, 7, 12, 20, 3, 5, 4, 8, 12 (median 7.5, 5/10 in 7–14) vs without 20, 7, 17, 10, 14, 3, 5, 4, 8, 13 (median 9). |
+| I-B1 | Arrival in the browser | pass | 2026-11-19 | Chrome 157 headless, `?levelSeconds=4` | Banner "MAJOR INCIDENT — Route Leak — BGP route leak", live-region announcement, alarm, HUD bar, edge pointer while off-screen, fully on screen ~1.7 s after arrival, incident music layer on. **2026-11-19 (feature 006):** now a standing red pulsing alert line, still up 6 s after arrival; announcement no longer overwritten by the same-step "Difficulty 7" banner. |
 | I-B2 | Behaviours in the browser | pass | 2026-11-19 | Chrome 157 headless | Leak bursts seen; Core Switch Failure warning shown twice and a tool shown OFFLINE; infected enemies seen. |
-| I-B3 | Resolution in the browser | pass | 2026-11-19 | Chrome 157 headless | "RESOLVED — Route Leak", resolution sound, one reward worth 72 drawn 2.5× size, collecting it raises telemetry, its pointer disappears. |
+| I-B3 | Resolution in the browser | pass | 2026-11-19 | Chrome 157 headless | "RESOLVED — Route Leak", resolution sound, one reward worth 72 drawn 2.5× size, collecting it raises telemetry, its pointer disappears. **2026-11-19 (feature 006):** the alert line turns green "RESOLVED — Route Leak" (steady) and is removed after 3.0 s. |
 | I-B4 | Overlap | pass | 2026-11-19 | Chrome 157 headless | Route Leak kept alive: two incidents, two HUD bars, pointer for the second, both behaviours running, incident music on. |
 | I-B5 | End summary | pass | 2026-11-19 | Chrome 157 headless | "Route Leak ✓ resolved · Core Switch Failure ✗ unresolved · Ransomware Outbreak — not reached". |
-| I-B6 | Phones and performance | pass | 2026-11-19 | Chrome 157 headless via DevTools Protocol, emulated safe areas | 390×844 and 844×390: incident panel and pointers inside the safe area, clear of the touch buttons; incident + ~300 enemies: 60 fps (p95 16.7 ms), CPU 4× slower: 60 fps. |
+| I-B6 | Phones and performance | pass | 2026-11-19 | Chrome 157 headless via DevTools Protocol, emulated safe areas | 390×844 and 844×390: incident panel and pointers inside the safe area, clear of the touch buttons; incident + ~300 enemies: 60 fps (p95 16.7 ms), CPU 4× slower: 60 fps. **2026-11-19 (feature 006):** also 360×640 and 640×360; the standing alert sits below the HUD, inside the safe area, clear of the incident panel and touch buttons (first try overlapped the touch buttons at 360×640; fixed by placing it under the measured HUD bottom). |
 | I-B7 | Regression | pass | 2026-11-19 | Chrome 157 headless; jsc | All feature 001–003 checks pass after two fixes found by this run: the roster check now ignores incidents when counting enemy types, and the end screen got a compact layout for small phones (the new Incidents row made it scroll at 360×640). |
+| I-B8 | Standing alerts: two incidents, reduced motion | pass | 2026-11-19 | Chrome 157 headless (B4, B7) | Two active incidents → two red alert lines; with reduced motion the line is red without pulsing. |
 | I-H1 | Concepts recognisable (SC-006) | not run |  |  | Needs a reviewer to name each incident's concept from its banner. |
 | I-H2 | Incident playtest (SC-003, SC-007) | not run |  |  | Needs 5 players; especially to judge I-S2's finding that strong runs now tend to end at an incident. |
 | G1–G6 | Field Guide unit tests (content, locking, stats for every rank, icons, no change, determinism) | pass | 2026-11-19 | jsc | 146/146 tests pass, including 12 new guide tests and the G6 determinism test: every tool and passive at ranks 1–5 matches the engine's rank tables and the level-up wording; building the guide leaves `hashRun` unchanged mid-run with two incidents and an offline tool. |
@@ -267,12 +302,24 @@ as "not run". M1/F1 record the test count when feature 001 was verified; the cur
 | GH1 | Screen reader (VoiceOver) | not run |  |  | Needs a person with VoiceOver on macOS or iOS. |
 | GH2 | Real phones | not run |  |  | Needs the feature 003 iPhone and Android. |
 | GH3 | Field Guide playtest (SC-006) | not run |  |  | Needs 5 players. |
+| L-U1–L-U8 | Late-game upgrade unit tests (data, effective stats, Traceroute, Rate Limiter, Null Route, passives, offers incl. tool floor, determinism) | pass | 2026-11-19 | jsc | 165/165 tests pass (19 new): every broken-data case named (incl. tool floor rules); bonuses add (Link Aggregation + Capacity Planning) and QoS shortens cooldown/hit cooldown only; measured hit amounts and fire timing match `effectiveToolStats`; Traceroute hop count/range; Rate Limiter slows ordinary enemies, never incidents, damages both; Null Route on the densest problem, 5 ticks over 2.5 s, ≤ 8 zones; passives change values by exactly their data %; below the tool floor offers are only new tools, above it unrestricted; exhausted pool → exactly [Capacity Planning, Failover], Failover 15%; hashes cover zones, slow field, Capacity Planning. |
+| L-S1 | Pool lasts (SC-001) | pass | 2026-11-19 | `python3 tests/balance/parallel.py upgrades s1`, 10 seeds, invincible, tools-first bot | 10/10 runs still have upgrades at difficulty 12; most run out at 18–20 or never (was ~8–12 before this feature). |
+| L-S2 | Never Failover-only (SC-002) | pass | 2026-11-19 | Same runs, 5 level-ups past exhaustion | 22 offers after the pool ran out, all exactly [Capacity Planning, Failover]. |
+| L-S3 | Build variety (SC-003) | pass | 2026-11-19 | 20 seeds, random choices | 14 distinct 4-tool builds. |
+| L-S4 | Fair difficulty (SC-004) | pass | 2026-11-19 | 10 seeds, not invincible, three player bots, each vs. a baseline without the new content, tool floor, or 15% heal | Median end level: tools-first 5.5 vs 4.5; random choices 5.5 vs 7; always choice 1 7.5 vs 7; 0 wins in every case. Reached after two balance changes the first results called for: the **tool floor** (5/10/15) and **front-loaded passives** (with the starting values, random and first-choice players were 2.5–3 levels worse). History in `specs/006-late-game-upgrades/contracts/game-data.md`. |
+| L-B1 | New tools in the browser | pass | 2026-11-19 | Chrome 157 headless | Traceroute path, Rate Limiter ring, and Null Route zone drawn; 12 problems resolved by the new tools alone in ~5 s; sounds: fire, pulse, hit all counted. |
+| L-B2 | Level-up text | pass | 2026-11-19 | Chrome 157 headless | Tool choices show the rank value plus "(X with bonuses)" equal to `effectiveToolStats` (e.g. "Damage 15 (17.55 with bonuses) · Cooldown 3 s (2.7 s with bonuses)"); below the tool floor the note "Your network needs more tools: choose one." and three new tools; maxed run → exactly [1] Capacity Planning "Taken 0× … All tool damage +0% → +5%" and [2] Failover "Restore Uptime +15%"; key 1 takes Capacity Planning. |
+| L-B3 | Field Guide and HUD | pass | 2026-11-19 | Chrome 157 headless | Guide lists 7 tools, 6 passives, and Capacity Planning ("Taken 2× · All tool damage +10%"), each with an icon; Ping stats show "(13.92 with bonuses)"; HUD shows "Capacity Planning ×2". |
+| L-B4 | Regression and performance | pass | 2026-11-19 | Chrome 157 headless (incl. DevTools-driven phones); jsc | Final run (with the tool floor, front-loaded passives, and standing incident alerts): full `python3 tests/browser/drive.py` 51/51 checks pass (features 001–006) in 709 s; `jsc -m tests/run.mjs` 165/165. 300 enemies with all three new tools at rank 5: 60 fps (p95 16.8 ms); phone fit T6 passes at 360×640 to 1024×768 with the longer level-up text; throttled phone T9 55–60 fps. The first full run found a real bug (stat lines built with `.map(describeStatChange)` showed "(0 with bonuses)"; fixed by a separate `describeStatWithBonus`) and three Major Incident checks that timed out once; they pass alone, as a group, and in the full re-run. |
+| L-H1 | Concepts recognisable (SC-005) | not run |  |  | Needs a reviewer to name each new item's concept from its name and description. |
+| L-H2 | Late-game playtest (SC-006) | not run |  |  | Needs 5 players; also judge whether the tool floor feels forced. |
 
 ## Project layout
 
 ```text
 index.html, style.css, main.js   Page shell, styles, game loop and wiring
-engine/                          Pure game rules (no DOM, seeded randomness); incidents.js = Major Incidents
+engine/                          Pure game rules (no DOM, seeded randomness); incidents.js = Major Incidents;
+                                 stats.js = tool stats after passive / Capacity Planning bonuses
 ui/                              Canvas rendering, HUD, screens, keyboard + touch input, URL params;
                                  pure helpers joystick.js, tapguard.js, view.js; touchmode.js;
                                  Field Guide model guide.js, icons.js, stattext.js (pure)
@@ -285,6 +332,7 @@ specs/002-procedural-audio/      Sound feature: spec, plan, tasks, contracts, qu
 specs/003-mobile-touch/          Touch and mobile feature: spec, plan, tasks, contracts, quickstart
 specs/004-major-incidents/       Major Incidents feature: spec, plan, tasks, contracts, quickstart
 specs/005-field-guide/           Field Guide feature: spec, plan, tasks, contracts, quickstart
+specs/006-late-game-upgrades/    Late-game upgrades feature: spec, plan, tasks, contracts, quickstart
 ```
 
 ## License

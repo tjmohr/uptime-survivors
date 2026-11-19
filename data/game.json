@@ -19,7 +19,21 @@
   },
   "levelUp": {
     "choices": 3,
-    "fallbackHealPercent": 20
+    "fallbackHealPercent": 15,
+    "toolFloor": [
+      {
+        "difficulty": 5,
+        "tools": 2
+      },
+      {
+        "difficulty": 10,
+        "tools": 3
+      },
+      {
+        "difficulty": 15,
+        "tools": 4
+      }
+    ]
   },
   "enemies": [
     {
@@ -279,6 +293,138 @@
           "range": 300
         }
       ]
+    },
+    {
+      "id": "traceroute",
+      "name": "Traceroute",
+      "concept": "Traceroute (hop-by-hop path discovery)",
+      "description": "Probes the path one hop at a time: a bolt hits the nearest problem, then jumps to the next.",
+      "kind": "chain",
+      "ranks": [
+        {
+          "damage": 12,
+          "cooldown": 1.4,
+          "range": 300,
+          "hops": 2,
+          "hopRange": 140
+        },
+        {
+          "damage": 14,
+          "cooldown": 1.3,
+          "range": 300,
+          "hops": 3,
+          "hopRange": 150
+        },
+        {
+          "damage": 17,
+          "cooldown": 1.2,
+          "range": 300,
+          "hops": 4,
+          "hopRange": 160
+        },
+        {
+          "damage": 20,
+          "cooldown": 1.0,
+          "range": 300,
+          "hops": 5,
+          "hopRange": 170
+        },
+        {
+          "damage": 24,
+          "cooldown": 0.9,
+          "range": 300,
+          "hops": 6,
+          "hopRange": 180
+        }
+      ]
+    },
+    {
+      "id": "rate-limiter",
+      "name": "Rate Limiter",
+      "concept": "Traffic policing (rate limiting)",
+      "description": "Polices traffic around you: problems in range slow down and are steadily worn away.",
+      "kind": "aura",
+      "ranks": [
+        {
+          "damage": 3,
+          "tickInterval": 0.5,
+          "radius": 90,
+          "slowPercent": 20
+        },
+        {
+          "damage": 4,
+          "tickInterval": 0.5,
+          "radius": 105,
+          "slowPercent": 25
+        },
+        {
+          "damage": 5,
+          "tickInterval": 0.5,
+          "radius": 120,
+          "slowPercent": 30
+        },
+        {
+          "damage": 6,
+          "tickInterval": 0.5,
+          "radius": 135,
+          "slowPercent": 35
+        },
+        {
+          "damage": 8,
+          "tickInterval": 0.5,
+          "radius": 150,
+          "slowPercent": 40
+        }
+      ]
+    },
+    {
+      "id": "null-route",
+      "name": "Null Route",
+      "concept": "Black-hole routing (RTBH)",
+      "description": "Routes the busiest cluster of problems into a black hole that drops everything inside.",
+      "kind": "zone",
+      "ranks": [
+        {
+          "damage": 6,
+          "tickInterval": 0.5,
+          "cooldown": 5,
+          "range": 350,
+          "radius": 60,
+          "duration": 2.5
+        },
+        {
+          "damage": 8,
+          "tickInterval": 0.5,
+          "cooldown": 4.5,
+          "range": 350,
+          "radius": 70,
+          "duration": 3
+        },
+        {
+          "damage": 10,
+          "tickInterval": 0.5,
+          "cooldown": 4,
+          "range": 350,
+          "radius": 80,
+          "duration": 3
+        },
+        {
+          "damage": 12,
+          "tickInterval": 0.5,
+          "cooldown": 3.5,
+          "range": 350,
+          "radius": 90,
+          "duration": 3.5
+        },
+        {
+          "damage": 14,
+          "tickInterval": 0.5,
+          "cooldown": 3,
+          "range": 350,
+          "radius": 100,
+          "duration": 4
+        }
+      ]
     }
   ],
   "passives": [
@@ -337,8 +483,107 @@
           "regenPerSecond": 1.0
         }
       ]
+    },
+    {
+      "id": "qos-policy",
+      "name": "QoS Policy",
+      "concept": "Quality of Service",
+      "description": "Prioritises your tools' traffic so every tool recharges faster.",
+      "ranks": [
+        {
+          "cooldownReductionPercent": 10
+        },
+        {
+          "cooldownReductionPercent": 14
+        },
+        {
+          "cooldownReductionPercent": 18
+        },
+        {
+          "cooldownReductionPercent": 22
+        },
+        {
+          "cooldownReductionPercent": 25
+        }
+      ]
+    },
+    {
+      "id": "link-aggregation",
+      "name": "Link Aggregation",
+      "concept": "Link aggregation (LACP)",
+      "description": "Bundles parallel links into one bigger pipe: every tool hits harder.",
+      "ranks": [
+        {
+          "damagePercent": 12
+        },
+        {
+          "damagePercent": 17
+        },
+        {
+          "damagePercent": 22
+        },
+        {
+          "damagePercent": 26
+        },
+        {
+          "damagePercent": 30
+        }
+      ]
+    },
+    {
+      "id": "observability-stack",
+      "name": "Observability Stack",
+      "concept": "Network monitoring and observability",
+      "description": "Better dashboards squeeze more telemetry out of every pickup.",
+      "ranks": [
+        {
+          "telemetryGainPercent": 15
+        },
+        {
+          "telemetryGainPercent": 22
+        },
+        {
+          "telemetryGainPercent": 28
+        },
+        {
+          "telemetryGainPercent": 34
+        },
+        {
+          "telemetryGainPercent": 40
+        }
+      ]
+    },
+    {
+      "id": "hardened-config",
+      "name": "Hardened Config",
+      "concept": "Device hardening",
+      "description": "Locks down management and services so problems that reach you do less damage.",
+      "ranks": [
+        {
+          "damageReductionPercent": 10
+        },
+        {
+          "damageReductionPercent": 14
+        },
+        {
+          "damageReductionPercent": 18
+        },
+        {
+          "damageReductionPercent": 22
+        },
+        {
+          "damageReductionPercent": 25
+        }
+      ]
     }
   ],
+  "repeatable": {
+    "id": "capacity-planning",
+    "name": "Capacity Planning",
+    "concept": "Capacity planning",
+    "description": "Everything is maxed — plan more headroom. All tools deal a little more damage, every time.",
+    "damagePercentPerTake": 5
+  },
   "difficulty": [
     {
       "level": 1,

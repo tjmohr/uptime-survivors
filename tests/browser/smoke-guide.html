@@ -114,7 +114,8 @@ try {
     await until(() => $('[role=tab][aria-selected=true]').id === 'tab-loadout', 2000, 'tab switch');
     const model = buildGuide(R());
     const list = entries();
-    expect(list.length === 6, `${list.length} loadout entries`);
+    // 7 tools + 6 passives + Capacity Planning (feature 006)
+    expect(list.length === model.loadout.length + 1, `${list.length} loadout entries`);
     model.loadout.forEach((item, i) => {
       const a = list[i];
       const status = item.owned ? `Rank ${item.rank} / 5${item.offline ? ' · OFFLINE' : ''}` : 'Not owned';

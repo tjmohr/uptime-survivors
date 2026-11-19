@@ -5,7 +5,7 @@ import { hashRun } from '../engine/hash.js';
 import { describeChange } from '../engine/progression.js';
 import { TOOL_KIND_FIELDS, RANK_COUNT } from '../engine/content.js';
 import { buildGuide } from '../ui/guide.js';
-import { describeStatChange } from '../ui/stattext.js';
+import { describeStatChange, describeStatWithBonus } from '../ui/stattext.js';
 import { shapePoints, problemIcon, loadoutIcon, LOCKED_COLOR, TOOL_COLORS } from '../ui/icons.js';
 import { quietRun, place } from './fixtures.js';
 
@@ -217,4 +217,26 @@ test('guide G5: buildGuide leaves the run hash unchanged mid-run with incidents 
   assertEqual(hashRun(run), before);
   assertEqual(JSON.stringify(run.encountered), json);
   assert(run.enemies.filter((e) => e.incidentId !== undefined).length >= 2, 'two incidents active');
+});
+
+// ---- Feature 006: new items, effective values, Capacity Planning ----
+
+test('guide (006): 7 tools, 6 passives, Capacity Planning entry; owned tools carry effective values', async () => {
+  const run = await quietRun();
+  run.engineer.passives.push({ id: 'link-aggregation', rank: 2 });
+  run.engineer.capacityTakes = 3;
+  const g = buildGuide(run);
+  assertEqual(g.loadout.filter((e) => e.kind === 'tool').length, 7);
+  assertEqual(g.loadout.filter((e) => e.kind === 'passive').length, 6);
+  assertEqual(g.capacity.timesTaken, 3);
+  assertEqual(g.capacity.totalPercent, 15);
+  const ping = g.loadout.find((e) => e.id === 'ping');
+  // Link Aggregation rank 2 + 3 × 5%, read from the data.
+  const la = run.defs.passive.get('link-aggregation').ranks[1].damagePercent;
+  const want = 10 * (1 + (la + 15) / 100);
+  assertEqual(Math.round(ping.effective.damage * 1000) / 1000, Math.round(want * 1000) / 1000);
+  assertEqual(describeStatWithBonus(ping.stats[0], ping.effective.damage), `Damage 10 (${Math.round(want * 100) / 100} with bonuses)`);
+  assertEqual(ping.stats.map(describeStatChange)[0], 'Damage 10', 'map() never adds a bonus');
+  assert(g.loadout.filter((e) => !e.owned).every((e) => e.effective === null), 'unowned: no effective values');
+  for (const def of run.data.tools) assert(loadoutIcon(def).includes(TOOL_COLORS[def.id]), `${def.id} icon`);
 });

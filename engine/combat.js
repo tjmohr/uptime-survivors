@@ -3,7 +3,7 @@
 import { ENGINEER_RADIUS } from './behaviors.js';
 import { spawnEnemy } from './spawner.js';
 import { rowFor } from './difficulty.js';
-import { addTelemetry } from './progression.js';
+import { addTelemetry, passiveTotals } from './progression.js';
 import { resolveIncident } from './incidents.js';
 
 const PICKUP_SPEED = 420;
@@ -88,7 +88,8 @@ export function applyContactDamage(run, dt) {
   }
   if (rate === 0) return;
   const iframeSeconds = run.data.player.invulnerableSeconds;
-  const amount = iframeSeconds > 0 ? rate * iframeSeconds : rate * dt;
+  const reduction = passiveTotals(run).damageReductionPercent; // Hardened Config (feature 006)
+  const amount = (iframeSeconds > 0 ? rate * iframeSeconds : rate * dt) * (1 - reduction / 100);
   e.uptime = Math.max(0, e.uptime - amount);
   e.invulnerableUntil = run.elapsed + iframeSeconds;
   run.events.push({ type: 'player-hit', amount });
@@ -102,6 +103,7 @@ export function applyRegen(run, dt) {
 export function updatePickups(run, dt) {
   const e = run.engineer;
   const kept = [];
+  const gain = 1 + passiveTotals(run).telemetryGainPercent / 100; // Observability Stack (feature 006)
   for (const p of run.pickups) {
     const dx = e.x - p.x;
     const dy = e.y - p.y;
@@ -113,7 +115,7 @@ export function updatePickups(run, dt) {
       p.y += (dy / d) * stepLen;
     }
     if (Math.hypot(e.x - p.x, e.y - p.y) <= PICKUP_COLLECT_DISTANCE) {
-      addTelemetry(run, p.value);
+      addTelemetry(run, p.value * gain);
       run.events.push({ type: 'pickup', value: p.value });
     } else kept.push(p);
   }

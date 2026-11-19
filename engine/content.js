@@ -9,10 +9,20 @@ export const TOOL_KIND_FIELDS = {
   orbit: ['damage', 'barriers', 'orbitRadius', 'rotationSpeed', 'hitCooldown'],
   pulse: ['damage', 'cooldown', 'radius'],
   spread: ['damage', 'cooldown', 'projectiles', 'projectileSpeed', 'range'],
+  // Feature 006 (specs/006-late-game-upgrades/data-model.md › Tool Definition)
+  chain: ['damage', 'cooldown', 'range', 'hops', 'hopRange'],
+  aura: ['damage', 'tickInterval', 'radius', 'slowPercent'],
+  zone: ['damage', 'tickInterval', 'cooldown', 'range', 'radius', 'duration'],
 };
-const INTEGER_RANK_FIELDS = new Set(['pierce', 'barriers', 'projectiles']);
+const INTEGER_RANK_FIELDS = new Set(['pierce', 'barriers', 'projectiles', 'hops']);
+// Extra per-stat limits beyond "greater than 0" (feature 006).
+const RANK_FIELD_MAX = { slowPercent: 80 };
 
-export const PASSIVE_FIELDS = ['maxUptimeBonus', 'regenPerSecond', 'moveSpeedPercent', 'pickupRadiusPercent'];
+export const PASSIVE_FIELDS = ['maxUptimeBonus', 'regenPerSecond', 'moveSpeedPercent', 'pickupRadiusPercent',
+  'cooldownReductionPercent', 'damagePercent', 'telemetryGainPercent', 'damageReductionPercent'];
+// Reductions must leave something: at most 50% per rank (feature 006 FR-010).
+const PASSIVE_FIELD_MAX = { cooldownReductionPercent: 50, damageReductionPercent: 50 };
+const REPEATABLE_FIELDS = ['id', 'name', 'concept', 'description', 'damagePercentPerTake'];
 
 const BEHAVIOR_FIELDS = {
   chase: [],
@@ -20,12 +30,12 @@ const BEHAVIOR_FIELDS = {
   blink: ['intervalSeconds', 'distance'],
 };
 
-const TOP_FIELDS = ['schemaVersion', 'player', 'caps', 'progression', 'levelUp', 'enemies', 'tools', 'passives', 'difficulty',
-  'incidentSpawnFactor', 'incidents'];
+const TOP_FIELDS = ['schemaVersion', 'player', 'caps', 'progression', 'levelUp', 'enemies', 'tools', 'passives', 'repeatable',
+  'difficulty', 'incidentSpawnFactor', 'incidents'];
 const PLAYER_FIELDS = ['maxUptime', 'moveSpeed', 'pickupRadius', 'invulnerableSeconds', 'startingTool', 'maxTools'];
 const CAPS_FIELDS = ['enemies', 'pickups', 'projectiles'];
 const PROGRESSION_FIELDS = ['base', 'perLevel'];
-const LEVELUP_FIELDS = ['choices', 'fallbackHealPercent'];
+const LEVELUP_FIELDS = ['choices', 'fallbackHealPercent', 'toolFloor'];
 const ENEMY_FIELDS = ['id', 'name', 'concept', 'description', 'shape', 'color', 'radius', 'health', 'speed',
   'contactDamagePerSecond', 'telemetry', 'behavior', 'debutLevel'];
 const TOOL_FIELDS = ['id', 'name', 'concept', 'description', 'kind', 'ranks'];
@@ -122,6 +132,26 @@ function checkSettings(raw, c) {
   if (lu) {
     if (lu.choices !== 3) c.add('levelUp.choices', null, 'levelUp.choices must equal 3');
     c.num(lu, 'fallbackHealPercent', 'levelUp', null, { min: 0, max: 100 });
+    // Feature 006: optional tool floor — from each difficulty, a level-up offers only new tools while the
+    // engineer has fewer than `tools` tools. Difficulties strictly increase; tools never decrease.
+    if (lu.toolFloor !== undefined) {
+      if (!Array.isArray(lu.toolFloor)) c.add('levelUp.toolFloor', null, 'toolFloor must be a list');
+      else {
+        let prev = null;
+        lu.toolFloor.forEach((f, i) => {
+          const fp = `levelUp.toolFloor[${i}]`;
+          if (!isObject(f)) return c.add(fp, null, 'toolFloor entry must be an object');
+          c.fields(f, ['difficulty', 'tools'], fp, null);
+          const okD = c.num(f, 'difficulty', fp, null, { min: 1, max: LEVEL_COUNT, integer: true });
+          const okT = c.num(f, 'tools', fp, null, { min: 1, max: raw.player?.maxTools ?? 4, integer: true });
+          if (okD && okT && prev) {
+            if (f.difficulty <= prev.difficulty) c.add(`${fp}.difficulty`, null, 'toolFloor difficulties must increase');
+            if (f.tools < prev.tools) c.add(`${fp}.tools`, null, 'toolFloor tools must not decrease');
+          }
+          if (okD && okT) prev = f;
+        });
+      }
+    }
   }
 }
 
@@ -208,7 +238,7 @@ function checkToolsAndPassives(raw, c) {
     const kindFields = TOOL_KIND_FIELDS[t.kind];
     if (!kindFields) return c.add(`${path}.kind`, id, `kind must be one of ${Object.keys(TOOL_KIND_FIELDS).join(', ')}`);
     checkRanks(t, path, id, c, kindFields, (r, rp) => {
-      for (const k of kindFields) c.num(r, k, rp, id, { gt: 0, integer: INTEGER_RANK_FIELDS.has(k) });
+      for (const k of kindFields) c.num(r, k, rp, id, { gt: 0, integer: INTEGER_RANK_FIELDS.has(k), max: RANK_FIELD_MAX[k] });
     });
   });
 
@@ -226,9 +256,20 @@ function checkToolsAndPassives(raw, c) {
       if (!keys) c.add(rp, id, 'rank must set at least one passive stat');
       if (firstKeys === null) firstKeys = keys;
       else if (keys !== firstKeys) c.add(rp, id, 'every rank must set the same stats');
-      for (const k of Object.keys(r)) if (PASSIVE_FIELDS.includes(k)) c.num(r, k, rp, id, { min: 0 });
+      for (const k of Object.keys(r)) if (PASSIVE_FIELDS.includes(k)) c.num(r, k, rp, id, { min: 0, max: PASSIVE_FIELD_MAX[k] });
     });
   });
+
+  // Feature 006: the one repeatable upgrade (Capacity Planning).
+  const rep = c.section(raw, 'repeatable', REPEATABLE_FIELDS);
+  if (rep) {
+    const id = typeof rep.id === 'string' ? rep.id : null;
+    claim(id, 'repeatable');
+    for (const [k, max] of Object.entries(TEXT_LIMITS)) {
+      if (c.str(rep, k, 'repeatable', id) && rep[k].length > max) c.add(`repeatable.${k}`, id, `'${k}' must be at most ${max} characters`);
+    }
+    c.num(rep, 'damagePercentPerTake', 'repeatable', id, { gt: 0 });
+  }
 }
 
 function checkDifficulty(raw, c) {
@@ -305,6 +346,7 @@ function checkIncidents(raw, c) {
   for (const [key, label] of [['enemies', 'enemy'], ['tools', 'tool'], ['passives', 'passive']]) {
     if (Array.isArray(raw[key])) for (const x of raw[key]) if (isObject(x) && typeof x.id === 'string') otherIds.set(x.id, label);
   }
+  if (isObject(raw.repeatable) && typeof raw.repeatable.id === 'string') otherIds.set(raw.repeatable.id, 'repeatable upgrade');
   const maxEnemyRadius = Math.max(0, ...enemies.map((e) => (typeof e.radius === 'number' ? e.radius : 0)));
   const ids = new Set();
   const levels = new Map();

@@ -12,6 +12,7 @@ usage (from the repository root):
     python3 tests/browser/drive.py --only touch     # just the touch/mobile checks (T1–T10, feature 003)
     python3 tests/browser/drive.py --only incident  # just the Major Incident checks (B1–B6, feature 004)
     python3 tests/browser/drive.py --only guide     # just the Field Guide checks (GB1–GB4, feature 005)
+    python3 tests/browser/drive.py --only upgrades  # just the late-game upgrade checks (B1–B3, feature 006)
     python3 tests/browser/drive.py --chrome "/path/to/chrome"
 
 These checks drive the game with synthetic key presses and, for long checks, make the engineer
@@ -63,11 +64,17 @@ CHECKS += [
     ("tests/browser/smoke-incidents.html?mode=behaviors", AUTOPLAY, 150),
     ("tests/browser/smoke-incidents.html?mode=overlap", AUTOPLAY, 120),
     ("tests/browser/smoke-incidents.html?mode=summary", AUTOPLAY, 120),
+    ("tests/browser/smoke-incidents.html?mode=alertmotion", ["--force-prefers-reduced-motion"], 90),
     # Feature 005: Field Guide (GB1–GB4; GB5 runs with the touch checks)
     ("tests/browser/smoke-guide.html?mode=open", [], 120),
     ("tests/browser/smoke-guide.html?mode=loadout", [], 60),
     ("tests/browser/smoke-guide.html?mode=keys", [], 90),
     ("tests/browser/smoke-guide.html?mode=aria", [], 60),
+    # Feature 006: late-game upgrades (B1–B3; B4 = the full suite)
+    ("tests/browser/smoke-upgrades.html?mode=tools", AUTOPLAY, 90),
+    ("tests/browser/smoke-upgrades.html?mode=levelup", [], 90),
+    ("tests/browser/smoke-upgrades.html?mode=guide", [], 60),
+    ("tests/browser/smoke-upgrades.html?mode=perf", [], 60),
 ]
 AUDIO_EXTENSIONS = (".wav", ".mp3", ".ogg", ".flac", ".m4a", ".aac", ".opus", ".webm", ".aif", ".aiff", ".mid", ".midi")
 FULL_RUN = ("tests/browser/smoke3.html?mode=full", [], 1500)
