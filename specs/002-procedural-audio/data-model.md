@@ -43,7 +43,8 @@ optionally slides to `toFreq` over `ms`. For `noise` voices `freq` sets the filt
 
 ### Sound Effect Definition
 
-`effects` is an object with exactly these 10 keys (FR-001, clarifications Q2–Q3):
+`effects` is an object with exactly these 10 keys (FR-001, clarifications Q2–Q3) — *feature 004 adds `incidentAlarm` and
+`incidentResolved` (12 keys; both follow the ≤ 3000 ms rule like `win`/`loss`)*:
 `fire`, `pulse`, `damage`, `hit`, `defeat`, `pickup`, `levelUp`, `newThreat`, `win`, `loss`.
 
 | Field | Type | Rule |
@@ -72,6 +73,7 @@ optionally slides to `toFreq` over `ms`. For `noise` voices `freq` sets the filt
 | `pattern` | string | Exactly `stepsPerBar` characters, each `x` (play) or `.` (rest); at least one `x` |
 | `voice` | Voice | Total duration ≤ 4 steps (one beat) at `bpmStart` — about 508 ms at 118 BPM (keeps hits short) |
 | `pitches` | optional array of numbers > 0 | If present, successive hits cycle through these frequencies (bass line) |
+| `trigger` | optional `"incident"` | *Feature 004:* instead of `joinLevel`, the layer plays while any Major Incident is active; exactly one such layer; never both `trigger` and `joinLevel` |
 
 Cross-file rules (checked with `data/game.json`):
 

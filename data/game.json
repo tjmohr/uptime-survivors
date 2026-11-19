@@ -604,5 +604,76 @@
         "ddos-botnet": 1
       }
     }
+  ],
+  "incidentSpawnFactor": 0.5,
+  "incidents": [
+    {
+      "id": "route-leak",
+      "name": "Route Leak",
+      "concept": "BGP route leak",
+      "description": "Routes are advertised far beyond where they belong, and traffic pours the wrong way.",
+      "arrivalLevel": 7,
+      "shape": "diamond",
+      "color": "#fb923c",
+      "radius": 46,
+      "health": 1200,
+      "speed": 70,
+      "entrySpeed": 240,
+      "entryDistance": 300,
+      "contactDamagePerSecond": 30,
+      "rewardTelemetry": 72,
+      "behavior": {
+        "kind": "leak",
+        "intervalSeconds": 5,
+        "burst": 6,
+        "maxAlive": 18,
+        "minionType": "latency-spike"
+      }
+    },
+    {
+      "id": "core-switch-failure",
+      "name": "Core Switch Failure",
+      "concept": "Single point of failure in the network core",
+      "description": "The core switch is down. Everything behind it flaps: links drop one at a time.",
+      "arrivalLevel": 12,
+      "shape": "square",
+      "color": "#94a3b8",
+      "radius": 60,
+      "health": 2600,
+      "speed": 40,
+      "entrySpeed": 240,
+      "entryDistance": 300,
+      "contactDamagePerSecond": 35,
+      "rewardTelemetry": 160,
+      "behavior": {
+        "kind": "link-down",
+        "cooldownSeconds": 12,
+        "warningSeconds": 1.5,
+        "offlineSeconds": 4
+      }
+    },
+    {
+      "id": "ransomware-outbreak",
+      "name": "Ransomware Outbreak",
+      "concept": "Malware spreading laterally across a network",
+      "description": "An infection is moving host to host. Everything near it gets tougher and faster.",
+      "arrivalLevel": 18,
+      "shape": "octagon",
+      "color": "#e879f9",
+      "radius": 52,
+      "health": 3400,
+      "speed": 85,
+      "entrySpeed": 240,
+      "entryDistance": 300,
+      "contactDamagePerSecond": 45,
+      "rewardTelemetry": 260,
+      "behavior": {
+        "kind": "infect",
+        "intervalSeconds": 1,
+        "radius": 140,
+        "healthMultiplier": 1.25,
+        "speedMultiplier": 1.15
+      }
+    }
   ]
 }

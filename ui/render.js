@@ -74,11 +74,14 @@ function makeSprite(shape, color, r) {
   return { canvas: c, size, r };
 }
 
-export function createRenderer(canvas, data, { showFps = false } = {}) {
+export function createRenderer(canvas, data, { showFps = false, getInsets = () => ({ top: 0, right: 0, bottom: 0, left: 0 }) } = {}) {
   const ctx = canvas.getContext('2d');
   const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
   const sprites = new Map();
   const enemyDefs = new Map(data.enemies.map((e) => [e.id, e]));
+  const incidentDefs = new Map((data.incidents ?? []).map((i) => [i.id, i]));
+  let pointers = []; // edge pointers drawn last frame (for checks)
+  let rewardDrawRadius = 0;
   let w = 0;
   let h = 0;
   let scale = 1;
@@ -126,6 +129,47 @@ export function createRenderer(canvas, data, { showFps = false } = {}) {
       }
       qualityMs = 0;
       qualityFrames = 0;
+    }
+  }
+
+  // Edge pointers (feature 004): screen-space arrows for off-screen incidents (their colour) and
+  // uncollected reward pickups (telemetry green), kept inside the safe area and below the HUD.
+  function drawPointers(run) {
+    pointers = [];
+    const e = run.engineer;
+    const dpr = canvas.width / Math.max(1, w);
+    const k = scale / dpr; // CSS px per game unit
+    const ins = getInsets();
+    const minX = ins.left + 18, maxX = w - ins.right - 18, minY = ins.top + 18, maxY = h - ins.bottom - 18;
+    const targets = [];
+    for (const n of run.enemies) {
+      if (n.incidentId !== undefined) targets.push({ kind: 'incident', id: n.incidentId, x: n.x, y: n.y, color: incidentDefs.get(n.incidentId).color, r: n.radius });
+    }
+    for (const p of run.pickups) if (p.reward) targets.push({ kind: 'reward', id: 'reward', x: p.x, y: p.y, color: COLORS.pickup, r: rewardDrawRadius });
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const t of targets) {
+      const sx = w / 2 + (t.x - e.x) * k;
+      const sy = h / 2 + (t.y - e.y) * k;
+      const rr = t.r * k;
+      if (sx + rr >= 0 && sx - rr <= w && sy + rr >= 0 && sy - rr <= h) continue; // visible
+      const dx = sx - w / 2, dy = sy - h / 2;
+      // Scale the direction until it touches the inner pointer box.
+      const fx = dx > 0 ? (maxX - w / 2) / dx : dx < 0 ? (minX - w / 2) / dx : Infinity;
+      const fy = dy > 0 ? (maxY - h / 2) / dy : dy < 0 ? (minY - h / 2) / dy : Infinity;
+      const f = Math.max(0, Math.min(fx, fy));
+      const px = w / 2 + dx * f, py = h / 2 + dy * f;
+      const a = Math.atan2(dy, dx);
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(a);
+      ctx.fillStyle = t.color;
+      ctx.strokeStyle = '#05080f';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(14, 0); ctx.lineTo(-8, -10); ctx.lineTo(-3, 0); ctx.lineTo(-8, 10); ctx.closePath();
+      ctx.stroke(); ctx.fill();
+      ctx.restore();
+      pointers.push({ kind: t.kind, id: t.id, x: px, y: py });
     }
   }
 
@@ -198,14 +242,47 @@ export function createRenderer(canvas, data, { showFps = false } = {}) {
       ctx.beginPath(); ctx.moveTo(e.x - halfW, y); ctx.lineTo(e.x + halfW, y); ctx.stroke();
     }
 
-    // Telemetry pickups
+    // Telemetry pickups. Incident rewards (feature 004) are 2.5× larger with a pulsing glow
+    // (a steady glow under reduced motion).
     const pk = sprite('pickup', 'diamond', COLORS.pickup, 5);
-    for (const p of run.pickups) drawSprite(pk, p.x, p.y, Math.min(9, 4 + Math.sqrt(p.value)));
+    const pulse = reduced() ? 0.6 : 0.45 + 0.35 * Math.sin((performance.now() / 1200) * Math.PI * 2);
+    for (const p of run.pickups) {
+      const r = Math.min(9, 4 + Math.sqrt(p.value));
+      if (p.reward) {
+        rewardDrawRadius = 9 * 2.5;
+        const halo = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rewardDrawRadius * 2.2);
+        halo.addColorStop(0, `rgba(74, 222, 128, ${pulse})`);
+        halo.addColorStop(1, 'rgba(74, 222, 128, 0)');
+        ctx.fillStyle = halo;
+        ctx.beginPath(); ctx.arc(p.x, p.y, rewardDrawRadius * 2.2, 0, Math.PI * 2); ctx.fill();
+        drawSprite(pk, p.x, p.y, rewardDrawRadius);
+      } else {
+        drawSprite(pk, p.x, p.y, r);
+      }
+    }
 
-    // Enemies
+    // Enemies; Major Incidents get their own look, infected enemies a magenta ring (feature 004).
     for (const n of run.enemies) {
+      if (n.incidentId !== undefined) {
+        const def = incidentDefs.get(n.incidentId);
+        const glow = reduced() ? 0.35 : 0.25 + 0.2 * Math.sin((performance.now() / 900) * Math.PI * 2);
+        ctx.strokeStyle = def.color;
+        ctx.globalAlpha = glow;
+        ctx.lineWidth = 10;
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.radius + 10, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+        drawSprite(sprite('incident-' + n.incidentId, def.shape, def.color, def.radius), n.x, n.y, n.radius);
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.radius + 4, 0, Math.PI * 2); ctx.stroke();
+        continue;
+      }
       const def = enemyDefs.get(n.typeId);
       drawSprite(sprite(n.typeId, def.shape, def.color, def.radius), n.x, n.y, n.radius);
+      if (n.infected) {
+        ctx.strokeStyle = '#e879f9';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.radius + 5, 0, Math.PI * 2); ctx.stroke();
+      }
     }
 
     // Pulse rings (Ansible Playbook)
@@ -223,7 +300,7 @@ export function createRenderer(canvas, data, { showFps = false } = {}) {
     // Orbiting Firewall Rule barriers, linked to the engineer like a diagram
     for (const tool of e.tools) {
       const def = run.defs.tool.get(tool.id);
-      if (def.kind !== 'orbit') continue;
+      if (def.kind !== 'orbit' || tool.offlineUntil > run.elapsed) continue; // offline: no barriers
       const barrier = sprite('barrier', 'hexagon', COLORS.barrier, BARRIER_RADIUS);
       ctx.strokeStyle = COLORS.barrier + '40';
       ctx.lineWidth = 1;
@@ -274,6 +351,7 @@ export function createRenderer(canvas, data, { showFps = false } = {}) {
     flash = Math.max(0, flash - dt);
     shake = Math.max(0, shake - dt);
 
+    drawPointers(run);
     trackFrame(frameSeconds);
     if (showFps) {
       // Test-only overlay (?fps=1) for measuring real phones (003 SC-004, quickstart H4).
@@ -296,6 +374,7 @@ export function createRenderer(canvas, data, { showFps = false } = {}) {
     particles: particles.length, rings: rings.length, flash, shake, reducedMotion: motionQuery.matches, scale,
     viewScale: viewScale(w, h), viewHalfShort: viewHalfShort(w, h), width: w, height: h,
     canvasWidth: canvas.width, canvasHeight: canvas.height, quality, resizes, frames: frameSummary(),
+    pointers: pointers.map((p) => ({ ...p })), rewardDrawRadius,
   });
 
   return { draw, handleEvents, resize, stats };

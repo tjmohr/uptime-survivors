@@ -5,12 +5,13 @@ import { SPAWN_DISTANCE } from './spawner.js';
 export const ENGINEER_RADIUS = 12;
 // Enemies left this far behind are moved back near the engineer, as is usual for the genre.
 const LEASH_DISTANCE = SPAWN_DISTANCE * 1.5;
-const MAX_ENEMY_RADIUS = 40;
+const MAX_ENEMY_RADIUS = 80; // covers Major Incidents (feature 004); hits are still checked exactly
 const neighbours = [];
 
 export function updateBehaviors(run, dt) {
   const eng = run.engineer;
   for (const enemy of run.enemies) {
+    if (enemy.incidentId !== undefined) continue; // moved by engine/incidents.js
     const def = run.defs.enemy.get(enemy.typeId);
     let dx = eng.x - enemy.x;
     let dy = eng.y - enemy.y;
@@ -63,10 +64,13 @@ export function updateBehaviors(run, dt) {
       if (d2 >= min * min || d2 === 0) continue;
       const d = Math.sqrt(d2);
       const push = ((min - d) / d) * 0.25;
-      a.x -= dx * push;
-      a.y -= dy * push;
-      b.x += dx * push;
-      b.y += dy * push;
+      // Ordinary enemies make way for a Major Incident; it is not pushed around by them.
+      const pa = a.incidentId !== undefined ? 0 : b.incidentId !== undefined ? 2 : 1;
+      const pb = b.incidentId !== undefined ? 0 : a.incidentId !== undefined ? 2 : 1;
+      a.x -= dx * push * pa;
+      a.y -= dy * push * pa;
+      b.x += dx * push * pb;
+      b.y += dy * push * pb;
     }
   }
 }

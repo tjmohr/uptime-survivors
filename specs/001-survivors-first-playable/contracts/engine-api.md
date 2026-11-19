@@ -37,6 +37,19 @@ the audio director — can give feedback without reading internals. Events are n
 | `blink` | `{x, y}` | Route Flap jump (available for effects) |
 | `fire` | `{toolId}` | Once per volley of a `projectile-nearest` or `spread` tool — firing sound (feature 002) |
 | `pickup` | `{value}` | Once per collected telemetry pickup — pickup sound (feature 002) |
+| `incident-arrived` | `{incidentId, x, y}` | A Major Incident arrives (feature 004) — banner, alarm |
+| `incident-resolved` | `{incidentId, x, y}` | A Major Incident is resolved — banner, sound; reward pickup dropped |
+| `link-warning` | `{incidentId, toolId, inSeconds}` | Core Switch Failure is about to take a tool offline (feature 004) |
+| `link-down` | `{incidentId, toolId, seconds}` | A tool went offline |
+| `link-restored` | `{toolId}` | An offline tool is back |
+| `infected` | `{count}` | Ransomware infected enemies this step |
+| `infection-cleared` | `{count}` | Infections ended (incident resolved) |
+| `leak` | `{incidentId, count}` | Route Leak released enemies |
+
+Feature 004 also adds `run.incidents` (one record per Major Incident: `id`, `state`
+`not-reached`/`active`/`resolved`, `arrivedAt`, `resolvedAt`), incident entries in `run.enemies` (marked by
+`incidentId`), tool `offlineUntil`, enemy `infected`, and pickup `reward`. See
+[specs/004-major-incidents/contracts/engine-api.md](../../004-major-incidents/contracts/engine-api.md).
 
 ## Guarantees tested
 

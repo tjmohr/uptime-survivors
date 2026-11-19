@@ -29,9 +29,9 @@ test('director: each engine event maps to its effect (A2)', async () => {
 test('director: difficulty change, run end, blink (A2)', async () => {
   const d = createDirector(await loadAudio());
   let plan = d.consume([{ type: 'difficulty-up', level: 5, debuts: [] }], 0);
-  assertEqual(plan, { effects: [], level: 5, runEnded: null });
+  assertEqual(plan, { effects: [], level: 5, runEnded: null, incidentActive: false });
   plan = d.consume([{ type: 'blink', x: 0, y: 0 }], 10);
-  assertEqual(plan, { effects: [], level: null, runEnded: null });
+  assertEqual(plan, { effects: [], level: null, runEnded: null, incidentActive: false });
   plan = d.consume([{ type: 'run-ended', outcome: 'win' }], 20);
   assertEqual(plan.runEnded, 'win');
   assertEqual(plan.effects, []);
@@ -131,4 +131,32 @@ test('director: a layer joins at every enemy debut level (A4, FR-007)', async ()
       `no new layer at level ${e.debutLevel}`);
   }
   for (let l = 2; l <= 20; l++) assert(layersForLevel(audio, l).length >= layersForLevel(audio, l - 1).length);
+});
+
+test('director: incident sounds always play, even with 8 effects sounding (U7, 004 FR-017)', async () => {
+  const audio = await loadAudio();
+  for (const name of Object.keys(audio.effects)) audio.effects[name].minIntervalMs = 0;
+  const d = createDirector(audio);
+  const busy = ['fire', 'pulse', 'player-hit', 'hit', 'enemy-defeated', 'pickup', 'level-up'].map((type) => ({ type, debuts: [] }));
+  d.consume(busy, 0);
+  d.consume([{ type: 'difficulty-up', level: 4, debuts: ['x'] }], 1);
+  let plan = d.consume([{ type: 'incident-arrived', incidentId: 'route-leak' }, ...busy], 2);
+  assert(plan.effects.includes('incidentAlarm'), JSON.stringify(plan));
+  assertEqual(plan.incidentActive, true);
+  plan = d.consume([{ type: 'incident-arrived', incidentId: 'core-switch-failure' }], 3);
+  plan = d.consume([{ type: 'incident-resolved', incidentId: 'route-leak' }, ...busy], 4);
+  assert(plan.effects.includes('incidentResolved'));
+  assertEqual(plan.incidentActive, true, 'one still active');
+  plan = d.consume([{ type: 'incident-resolved', incidentId: 'core-switch-failure' }], 5);
+  assertEqual(plan.incidentActive, false);
+  assertEqual(d.counts.incidentAlarm, 2);
+  assertEqual(d.counts.incidentResolved, 2);
+  d.consume([{ type: 'incident-arrived', incidentId: 'x' }], 6);
+  d.reset();
+  assertEqual(d.consume([], 7).incidentActive, false, 'reset clears the incident count');
+});
+
+test('director: the incident layer is not a level layer (U7)', async () => {
+  const audio = await loadAudio();
+  for (let l = 1; l <= 20; l++) assert(!layersForLevel(audio, l).some((x) => x.trigger === 'incident'));
 });

@@ -22,7 +22,10 @@ export function createHud(testLabel) {
     test: $('hud-test'),
     sound: $('hud-sound'),
     touchSound: $('touch-sound'),
+    incidents: $('hud-incidents'),
+    linkWarning: $('hud-link-warning'),
   };
+  let incidentKey = '';
   if (testLabel) {
     els.test.textContent = testLabel;
     els.test.hidden = false;
@@ -42,20 +45,64 @@ export function createHud(testLabel) {
     els.levelTime.textContent = `${Math.max(0, Math.ceil(left))}s left in level`;
     els.time.textContent = formatTime(run.elapsed);
 
-    const key = [...e.tools, ...e.passives].map((x) => `${x.id}:${x.rank}`).join(',');
+    const offline = (t) => t.offlineUntil > run.elapsed;
+    const key = [...e.tools.map((t) => `${t.id}:${t.rank}:${offline(t)}`), ...e.passives.map((p) => `${p.id}:${p.rank}`)].join(',');
     if (key !== loadoutKey) {
       loadoutKey = key;
       els.loadout.replaceChildren(
-        ...e.tools.map((t) => item(run.defs.tool.get(t.id).name, t.rank)),
+        ...e.tools.map((t) => item(run.defs.tool.get(t.id).name, t.rank, offline(t))),
         ...e.passives.map((p) => item(run.defs.passive.get(p.id).name, p.rank)),
       );
     }
+    updateIncidents(run);
   }
 
-  function item(name, rank) {
+  // Major Incidents (feature 004): one name + health bar per active incident, and the
+  // Core Switch Failure warning line.
+  function updateIncidents(run) {
+    const active = run.enemies.filter((n) => n.incidentId !== undefined);
+    const ids = active.map((n) => n.id).join(',');
+    if (ids !== incidentKey) {
+      incidentKey = ids;
+      els.incidents.replaceChildren(...active.map((n) => {
+        const def = run.defs.incident.get(n.incidentId);
+        const row = document.createElement('div');
+        row.className = 'incident-row';
+        row.dataset.entity = String(n.id);
+        row.setAttribute('role', 'group');
+        row.setAttribute('aria-label', `Major incident: ${def.name}`);
+        const name = document.createElement('span');
+        name.className = 'incident-name';
+        name.textContent = `⚠ ${def.name}`;
+        const bar = document.createElement('div');
+        bar.className = 'bar incident-bar';
+        const fill = document.createElement('div');
+        fill.className = 'bar-fill';
+        fill.style.background = def.color;
+        bar.append(fill);
+        row.append(name, bar);
+        return row;
+      }));
+      els.incidents.hidden = active.length === 0;
+    }
+    for (const row of els.incidents.children) {
+      const n = active.find((x) => String(x.id) === row.dataset.entity);
+      if (n) row.querySelector('.bar-fill').style.width = `${Math.max(0, (n.health / n.maxHealth) * 100)}%`;
+    }
+    const warn = active.find((n) => n.linkState === 'warning' && n.pendingTool);
+    if (warn) {
+      els.linkWarning.textContent = `Link down in ${Math.max(0, warn.timer).toFixed(1)} s: ${run.defs.tool.get(warn.pendingTool).name}`;
+      els.linkWarning.hidden = false;
+    } else if (!els.linkWarning.hidden) {
+      els.linkWarning.hidden = true;
+    }
+  }
+
+  function item(name, rank, offline = false) {
     const li = document.createElement('li');
-    li.textContent = `${name} ${'▮'.repeat(rank)}${'▯'.repeat(5 - rank)}`;
-    li.setAttribute('aria-label', `${name} rank ${rank} of 5`);
+    li.textContent = `${name} ${'▮'.repeat(rank)}${'▯'.repeat(5 - rank)}${offline ? ' OFFLINE' : ''}`;
+    li.setAttribute('aria-label', `${name} rank ${rank} of 5${offline ? ', offline' : ''}`);
+    if (offline) li.className = 'offline';
     return li;
   }
 

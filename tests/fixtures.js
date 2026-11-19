@@ -8,6 +8,7 @@ import { rowFor } from '../engine/difficulty.js';
 export async function quietRun(opts = {}, edit = () => {}) {
   const data = await loadGameData();
   for (const row of data.difficulty) row.spawnPerSecond = 1e-9;
+  data.incidents = []; // quiet means quiet: no Major Incidents unless a test adds them (feature 004)
   edit(data);
   return createRun(data, { seed: 1, ...opts });
 }

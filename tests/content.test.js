@@ -128,3 +128,44 @@ test('content: every description is one line of at most 120 characters and every
     assert(!item.description.includes('\n'), `${item.id} description must be one line`);
   }
 });
+
+// ---------- Feature 004: Major Incidents (U1) ----------
+
+const inc = (d, id) => d.incidents.find((x) => x.id === id);
+
+test('content: shipped incidents are valid, three of them at levels 7, 12, 18', async () => {
+  const d = await loadGameData();
+  assert(validateGameData(d).ok);
+  assertEqual(d.incidents.map((i) => i.arrivalLevel), [7, 12, 18]);
+});
+
+test('content: broken incident data is rejected naming the incident (U1)', async () => {
+  const cases = [
+    [(d) => { delete d.incidents; }, 'incidents', null],
+    [(d) => { d.incidents.pop(); }, 'incidents', null],
+    [(d) => { d.incidents[1].arrivalLevel = 7; }, 'incidents[1].arrivalLevel', 'core-switch-failure'],
+    [(d) => { d.incidents[0].id = 'dropped-packet'; }, 'incidents[0].id', 'dropped-packet'],
+    [(d) => { d.incidents[0].id = 'ping'; }, 'incidents[0].id', 'ping'],
+    [(d) => { d.incidents[0].behavior.kind = 'teleport'; }, 'incidents[0].behavior.kind', 'route-leak'],
+    [(d) => { delete inc(d, 'core-switch-failure').behavior.offlineSeconds; }, 'incidents[1].behavior.offlineSeconds', 'core-switch-failure'],
+    [(d) => { inc(d, 'ransomware-outbreak').behavior.burst = 3; }, 'incidents[2].behavior.burst', 'ransomware-outbreak'],
+    [(d) => { inc(d, 'route-leak').behavior.minionType = 'packet-storm'; }, 'incidents[0].behavior.minionType', 'route-leak'],
+    [(d) => { inc(d, 'core-switch-failure').behavior.cooldownSeconds = 5; }, 'incidents[1].behavior.cooldownSeconds', 'core-switch-failure'],
+    [(d) => { inc(d, 'route-leak').radius = 20; }, 'incidents[0].radius', 'route-leak'],
+    [(d) => { inc(d, 'route-leak').entrySpeed = 10; }, 'incidents[0].entrySpeed', 'route-leak'],
+    [(d) => { d.incidentSpawnFactor = 0; }, 'incidentSpawnFactor', null],
+    [(d) => { d.incidentSpawnFactor = 1.5; }, 'incidentSpawnFactor', null],
+    [(d) => { delete d.incidentSpawnFactor; }, 'incidentSpawnFactor', null],
+    [(d) => { inc(d, 'route-leak').contactDamagePerSecond = 5; }, 'incidents[0].contactDamagePerSecond', 'route-leak'],
+    [(d) => { inc(d, 'route-leak').hp = 5; }, 'incidents[0].hp', 'route-leak'],
+    [(d) => { inc(d, 'route-leak').name = 'x'.repeat(41); }, 'incidents[0].name', 'route-leak'],
+    [(d) => { inc(d, 'route-leak').rewardTelemetry = 0; }, 'incidents[0].rewardTelemetry', 'route-leak'],
+  ];
+  for (const [edit, path, id] of cases) {
+    const d = await loadGameData();
+    edit(d);
+    const r = validateGameData(d);
+    const err = errorAt(r, path);
+    if (id !== null) assertEqual(err.id, id, path);
+  }
+});

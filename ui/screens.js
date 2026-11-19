@@ -246,6 +246,18 @@ export function createScreens({ touchMode = null } = {}) {
       ...slider('effects-volume', 'Effects', 'effectsVolume', sound.onEffects));
   }
 
+  // Feature 004: each Major Incident as resolved, unresolved (still active at the end), or not reached.
+  function incidentSummary(run) {
+    if (!run.incidents || run.incidents.length === 0) return [];
+    const text = run.incidents.map((r) => {
+      const name = run.defs.incident.get(r.id).name;
+      if (r.state === 'resolved') return `${name} ✓ resolved`;
+      if (r.state === 'active') return `${name} ✗ unresolved`;
+      return `${name} — not reached`;
+    }).join(' · ');
+    return [el('dt', {}, 'Incidents'), el('dd', { class: 'incidents-summary' }, text)];
+  }
+
   function showEnd(run, { onNew, onReplay }) {
     const win = run.outcome === 'win';
     const e = run.engineer;
@@ -260,6 +272,7 @@ export function createScreens({ touchMode = null } = {}) {
       el('dt', {}, 'Problems resolved'), el('dd', {}, String(run.stats.enemiesDefeated)),
       el('dt', {}, 'Engineer level'), el('dd', {}, String(e.level)),
       el('dt', {}, 'Tools & passives'), el('dd', {}, loadout),
+      ...incidentSummary(run),
       el('dt', {}, 'Seed'), el('dd', {}, String(run.seed)));
     open('ended', el('div', { className: 'panel' },
       el('h2', {}, win ? 'UPTIME PRESERVED — you win' : 'NETWORK DOWN — run lost'),

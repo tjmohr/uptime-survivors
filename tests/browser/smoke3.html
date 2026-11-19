@@ -49,6 +49,7 @@ try {
       }
       maxTools = Math.max(maxTools, run.engineer.tools.length);
       for (const e of run.enemies) {
+        if (e.incidentId !== undefined) continue; // Major Incidents (feature 004) are not ordinary enemy types
         types.add(e.typeId);
         if (e.generation > 0) splitSeen = true;
         if (e.typeId === 'route-flap') {

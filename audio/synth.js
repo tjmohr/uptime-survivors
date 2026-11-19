@@ -23,7 +23,9 @@ export function createAudio(audioData, settings) {
   let timer = null;
   const effectCounts = Object.fromEntries(EFFECT_NAMES.map((n) => [n, 0]));
   const layerCounts = Object.fromEntries(music.layers.map((l) => [l.id, 0]));
-  const seq = { playing: false, step: 0, nextTime: 0, level: 1, pendingLevel: null, bpm: music.bpmStart, layers: [], pitchIndex: {} };
+  const seq = { playing: false, step: 0, nextTime: 0, level: 1, pendingLevel: null, bpm: music.bpmStart, layers: [], pitchIndex: {},
+    incident: false, pendingIncident: null };
+  const incidentLayers = music.layers.filter((l) => l.trigger === 'incident'); // feature 004
 
   let lastError = null;
   function fail(err) {
@@ -136,7 +138,11 @@ export function createAudio(audioData, settings) {
         applyLevel(seq.pendingLevel); // tempo and layers change only on a bar boundary
         seq.pendingLevel = null;
       }
-      for (const layer of seq.layers) {
+      if (seq.step === 0 && seq.pendingIncident !== null) {
+        seq.incident = seq.pendingIncident;
+        seq.pendingIncident = null;
+      }
+      for (const layer of seq.incident ? [...seq.layers, ...incidentLayers] : seq.layers) {
         if (layer.pattern[seq.step] !== 'x') continue;
         let pitch;
         if (layer.pitches) {
@@ -211,6 +217,8 @@ export function createAudio(audioData, settings) {
       seq.playing = true;
       seq.step = 0;
       seq.pendingLevel = null;
+      seq.incident = false;
+      seq.pendingIncident = null;
       seq.pitchIndex = {};
       applyLevel(1);
       if (status !== 'running') return;
@@ -225,6 +233,12 @@ export function createAudio(audioData, settings) {
 
     setLevel: guard((level) => {
       if (level !== seq.level || seq.pendingLevel !== null) seq.pendingLevel = level;
+    }),
+
+    // Feature 004: the incident layer joins/leaves at the next bar boundary.
+    setIncident: guard((value) => {
+      if (value === (seq.pendingIncident ?? seq.incident)) return;
+      seq.pendingIncident = value;
     }),
 
     setDucked: guard((value) => {
@@ -271,7 +285,8 @@ export function createAudio(audioData, settings) {
         level: seq.level,
         bpm: seq.bpm,
         musicPlaying: seq.playing && timer !== null,
-        activeLayers: seq.layers.map((l) => l.id),
+        activeLayers: (seq.incident ? [...seq.layers, ...incidentLayers] : seq.layers).map((l) => l.id),
+        incidentMusic: seq.incident,
         effectCounts: { ...effectCounts },
         layerCounts: { ...layerCounts },
         contextState: ctx ? ctx.state : null,

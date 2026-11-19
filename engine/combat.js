@@ -4,10 +4,11 @@ import { ENGINEER_RADIUS } from './behaviors.js';
 import { spawnEnemy } from './spawner.js';
 import { rowFor } from './difficulty.js';
 import { addTelemetry } from './progression.js';
+import { resolveIncident } from './incidents.js';
 
 const PICKUP_SPEED = 420;
 const PICKUP_COLLECT_DISTANCE = ENGINEER_RADIUS + 4;
-const MAX_ENEMY_RADIUS = 40;
+const MAX_ENEMY_RADIUS = 80; // covers Major Incidents (feature 004); contact is still checked exactly
 const touching = [];
 
 // Any finite number, clamped to [-1, 1]; anything else (NaN, Infinity, non-numbers) counts as 0.
@@ -25,14 +26,21 @@ export function moveEngineer(run, input, dt) {
   e.facing = Math.atan2(dy, dx);
 }
 
-export function addPickup(run, x, y, value) {
+export function addPickup(run, x, y, value, { reward = false } = {}) {
   const pickups = run.pickups;
-  if (pickups.length >= run.data.caps.pickups && pickups.length >= 2) {
-    // Over the cap: merge the two oldest so no telemetry is lost.
-    pickups[0].value += pickups[1].value;
-    pickups.splice(1, 1);
+  let ordinary = 0;
+  for (const p of pickups) if (!p.reward) ordinary++;
+  if (!reward && ordinary >= run.data.caps.pickups && ordinary >= 2) {
+    // Over the cap: merge the two oldest ordinary pickups so no telemetry is lost. Incident reward
+    // pickups (feature 004) are never merged or removed.
+    const first = pickups.findIndex((p) => !p.reward);
+    const second = pickups.findIndex((p, i) => i > first && !p.reward);
+    pickups[first].value += pickups[second].value;
+    pickups.splice(second, 1);
   }
-  pickups.push({ x, y, value, magnet: false });
+  const pickup = { x, y, value, magnet: false };
+  if (reward) pickup.reward = true;
+  pickups.push(pickup);
 }
 
 export function resolveDefeats(run) {
@@ -44,6 +52,10 @@ export function resolveDefeats(run) {
   const row = rowFor(run.data, run.difficultyLevel);
   for (const enemy of fallen) {
     run.stats.enemiesDefeated += 1;
+    if (enemy.incidentId !== undefined) {
+      resolveIncident(run, enemy); // reward pickup instead of ordinary telemetry (feature 004)
+      continue;
+    }
     run.events.push({ type: 'enemy-defeated', typeId: enemy.typeId, x: enemy.x, y: enemy.y });
     addPickup(run, enemy.x, enemy.y, enemy.telemetry);
     const b = run.defs.enemy.get(enemy.typeId).behavior;

@@ -146,7 +146,8 @@ previous volumes); open Pause, change music and effects volume, and hear the cha
 
 **Sound effects**
 
-- **FR-001**: The game MUST play a distinct sound effect for each of these 10 events: projectile tool
+- **FR-001**: *(Extended by feature 004 with `incidentAlarm` and `incidentResolved` for Major Incidents —
+  12 effects in total; see [specs/004-major-incidents/](../004-major-incidents/spec.md).)* The game MUST play a distinct sound effect for each of these 10 events: projectile tool
   fire (shared by Ping and Load Balancer), automation pulse (Ansible Playbook), engineer damaged
   (every time Uptime is lost, whatever the source), enemy hit, enemy
   defeated, telemetry collected, engineer level-up, new-threat banner, run won, run lost. Firewall

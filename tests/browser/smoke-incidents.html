@@ -1,0 +1,177 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>smoke-incidents</title></head>
+<body>
+<iframe id="f" width="1280" height="800"></iframe>
+<script type="module">
+// Scripted Major Incident checks B1–B5 (specs/004-major-incidents/quickstart.md), run by drive.py.
+// Test-only helpers use the read-only debug handle to keep the engineer alive and speed things up.
+const mode = new URLSearchParams(location.search).get('mode');
+const results = { mode };
+const frame = document.getElementById('f');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const W = () => frame.contentWindow;
+const G = () => W().__uptimeSurvivors;
+const R = () => G().run;
+const doc = () => frame.contentDocument;
+const key = (type, code) => W().dispatchEvent(new (W().KeyboardEvent)(type, { code, bubbles: true }));
+async function until(fn, ms = 20000, label = '') {
+  const t0 = performance.now();
+  while (performance.now() - t0 < ms) { try { if (fn()) return true; } catch {} await sleep(15); }
+  throw new Error('timeout: ' + label);
+}
+async function start(url) {
+  const loaded = new Promise((r) => frame.addEventListener('load', r, { once: true }));
+  frame.src = url;
+  await loaded;
+  await until(() => doc()?.querySelector('#overlay button') && G().audio, 10000, 'title');
+  doc().querySelector('#overlay button').click();
+  await until(() => R()?.phase === 'playing', 3000, 'start');
+}
+// Keeps the engineer alive and answers level-ups with choice 1; runs `each` every tick.
+let keeper = null;
+function keepAlive(each = () => {}) {
+  clearInterval(keeper);
+  keeper = setInterval(() => {
+    const run = R();
+    if (!run) return;
+    run.engineer.maxUptime = 1e12; run.engineer.uptime = 1e12;
+    if (run.phase === 'levelup') { key('keydown', 'Digit1'); key('keyup', 'Digit1'); }
+    each(run);
+  }, 20);
+}
+const incident = (id) => R().enemies.find((e) => e.incidentId === id);
+const bannerText = () => doc().getElementById('banner').textContent;
+const hudRows = () => [...doc().querySelectorAll('#hud-incidents .incident-row')].map((r) => r.textContent.trim());
+let pass = true;
+const notes = [];
+const expect = (cond, text) => { notes.push(`${cond ? 'ok' : 'FAIL'} ${text}`); pass &&= !!cond; };
+
+try {
+  if (mode === 'arrival') {
+    // B1: Route Leak arrives at level 7 (24 s with 4-second levels).
+    await start('/index.html?seed=7&levelSeconds=4');
+    keepAlive();
+    await until(() => incident('route-leak'), 40000, 'route leak arrives');
+    const tArrive = performance.now();
+    await until(() => bannerText().startsWith('MAJOR INCIDENT'), 3000, 'banner');
+    const banner = bannerText();
+    const pointerAtArrival = G().render.pointers.some((p) => p.kind === 'incident' && p.id === 'route-leak');
+    expect(banner === 'MAJOR INCIDENT — Route Leak — BGP route leak', `banner "${banner}"`);
+    await until(() => doc().getElementById('live').textContent.startsWith('MAJOR INCIDENT'), 1500, 'live region').catch(() => {});
+    expect(doc().getElementById('live').textContent.startsWith('MAJOR INCIDENT'), `announced in the live region ("${doc().getElementById('live').textContent}")`);
+    await until(() => G().audio.effectCounts.incidentAlarm >= 1, 2000, 'alarm');
+    expect(true, 'alarm sound played');
+    expect(hudRows().some((t) => t.includes('Route Leak')) && !doc().getElementById('hud-incidents').hidden, `HUD shows ${JSON.stringify(hudRows())}`);
+    expect(pointerAtArrival, 'edge pointer while off-screen');
+    await until(() => { const e = incident('route-leak'); const r = R().engineer; return Math.hypot(e.x - r.x, e.y - r.y) + e.radius <= G().render.viewHalfShort; }, 2500, 'on screen');
+    const onScreenMs = performance.now() - tArrive;
+    expect(onScreenMs <= 2000, `fully on screen ${onScreenMs.toFixed(0)} ms after arrival (≤ 2000)`);
+    await sleep(200);
+    expect(!G().render.pointers.some((p) => p.kind === 'incident'), 'no pointer once on screen');
+    expect(G().audio.incidentMusic === true || G().audio.status !== 'running', `incident music layer on (${G().audio.incidentMusic})`);
+    results.B1 = { pass, note: notes.join('; ') };
+  }
+
+  if (mode === 'resolve') {
+    // B3: resolve Route Leak; RESOLVED banner, sound, big glowing reward, collecting it.
+    await start('/index.html?seed=7&levelSeconds=4');
+    keepAlive();
+    await until(() => incident('route-leak'), 40000, 'route leak arrives');
+    await sleep(2500);
+    const inc = incident('route-leak');
+    const at = { x: inc.x, y: inc.y };
+    inc.health = 0; inc.dead = true;
+    await until(() => bannerText().startsWith('RESOLVED'), 6000, 'resolved banner');
+    expect(bannerText() === 'RESOLVED — Route Leak', `banner "${bannerText()}"`);
+    await until(() => G().audio.effectCounts.incidentResolved >= 1, 2000, 'resolved sound');
+    expect(true, 'resolution sound played');
+    const reward = R().pickups.find((p) => p.reward);
+    expect(reward && reward.value === R().data.incidents[0].rewardTelemetry && Math.abs(reward.x - at.x) < 30, `one reward pickup worth ${reward && reward.value}`);
+    expect(G().render.rewardDrawRadius >= 22, `reward drawn large (radius ${G().render.rewardDrawRadius})`);
+    expect(R().incidents[0].state === 'resolved', 'record resolved');
+    // Collect it: move it onto the engineer.
+    const before = R().engineer.telemetry + R().engineer.level * 1e6;
+    reward.x = R().engineer.x; reward.y = R().engineer.y;
+    await until(() => !R().pickups.some((p) => p.reward), 3000, 'collected');
+    const after = R().engineer.telemetry + R().engineer.level * 1e6;
+    expect(after > before, 'collecting it raised telemetry / level');
+    expect(!G().render.pointers.some((p) => p.kind === 'reward'), 'no reward pointer once collected');
+    results.B3 = { pass, note: notes.join('; ') };
+  }
+
+  if (mode === 'behaviors') {
+    // B2: each signature behaviour seen at least twice (incidents kept alive).
+    await start('/index.html?seed=13&levelSeconds=4');
+    const leaked = new Set();
+    let warnings = 0, sawOffline = false, lastWarn = false, infectedSeen = 0;
+    keepAlive((run) => {
+      for (const e of run.enemies) {
+        if (e.incidentId !== undefined) e.health = e.maxHealth = 1e12;
+        if (e.leakedBy !== undefined) leaked.add(e.id);
+        if (e.infected) infectedSeen = Math.max(infectedSeen, run.enemies.filter((x) => x.infected).length);
+      }
+      if (run.difficultyLevel >= 12 && run.engineer.tools.length < 2) run.engineer.tools.push({ id: 'load-balancer', rank: 1, cooldownLeft: 0 });
+      const warnShown = !doc().getElementById('hud-link-warning').hidden;
+      if (warnShown && !lastWarn) warnings++;
+      lastWarn = warnShown;
+      if (doc().querySelector('#hud-loadout li.offline')) sawOffline = true;
+    });
+    await until(() => R().difficultyLevel >= 18, 90000, 'level 18');
+    await sleep(4000);
+    const burst = R().data.incidents[0].behavior.burst;
+    expect(leaked.size >= burst * 2, `Route Leak released ${leaked.size} enemies (≥ ${burst * 2}: two bursts)`);
+    expect(warnings >= 2, `Core Switch Failure warned ${warnings} times in the HUD`);
+    expect(sawOffline, 'a tool shown OFFLINE in the loadout');
+    expect(infectedSeen >= 1, `Ransomware infected up to ${infectedSeen} enemies at once`);
+    results.B2 = { pass, note: notes.join('; ') };
+  }
+
+  if (mode === 'overlap') {
+    // B4: Route Leak never resolved; at level 12 two incidents, two HUD bars, both behaviours.
+    await start('/index.html?seed=21&levelSeconds=4');
+    let pointerForSecond = false;
+    keepAlive((run) => {
+      const leak = run.enemies.find((e) => e.incidentId === 'route-leak');
+      if (leak) leak.health = leak.maxHealth = 1e12;
+      if (run.engineer.tools.length < 2) run.engineer.tools.push({ id: 'load-balancer', rank: 1, cooldownLeft: 0 });
+      if (G().render.pointers.some((p) => p.id === 'core-switch-failure')) pointerForSecond = true;
+    });
+    await until(() => incident('core-switch-failure'), 60000, 'second incident');
+    await sleep(1500);
+    expect(R().enemies.filter((e) => e.incidentId !== undefined).length === 2, 'two incidents active');
+    expect(hudRows().length === 2, `two HUD bars: ${JSON.stringify(hudRows())}`);
+    expect(pointerForSecond, 'pointer shown for the arriving second incident');
+    const leakId = incident('route-leak').id;
+    const leakedBefore = R().enemies.filter((e) => e.leakedBy === leakId).length;
+    await until(() => !doc().getElementById('hud-link-warning').hidden, 12000, 'link warning while overlapping');
+    expect(true, 'Core Switch Failure warns while Route Leak is still active');
+    await sleep(5500);
+    expect(R().enemies.filter((e) => e.leakedBy === leakId).length > 0 || leakedBefore > 0, 'Route Leak still leaking');
+    expect(G().audio.incidentMusic === true, 'incident music on');
+    results.B4 = { pass, note: notes.join('; ') };
+  }
+
+  if (mode === 'summary') {
+    // B5: resolve incident 1, leave incident 2 unresolved, end before incident 3.
+    await start('/index.html?seed=5&levelSeconds=4');
+    keepAlive((run) => {
+      const csf = run.enemies.find((e) => e.incidentId === 'core-switch-failure');
+      if (csf) csf.health = csf.maxHealth = 1e12;
+    });
+    await until(() => incident('route-leak'), 40000, 'incident 1');
+    const leak = incident('route-leak'); leak.health = 0; leak.dead = true;
+    await until(() => incident('core-switch-failure') && R().difficultyLevel >= 13, 40000, 'incident 2 + level 13');
+    clearInterval(keeper);
+    R().engineer.uptime = 0;
+    await until(() => R().phase === 'ended' && doc().querySelector('.incidents-summary'), 5000, 'end screen');
+    const text = doc().querySelector('.incidents-summary').textContent;
+    expect(text === 'Route Leak ✓ resolved · Core Switch Failure ✗ unresolved · Ransomware Outbreak — not reached', `summary "${text}"`);
+    results.B5 = { pass, note: notes.join('; ') };
+  }
+} catch (err) {
+  results.error = String(err && err.stack || err) + ' | so far: ' + notes.join('; ');
+}
+clearInterval(keeper);
+fetch('/__result?d=' + encodeURIComponent(JSON.stringify(results))).catch(() => {});
+</script>
+</body></html>

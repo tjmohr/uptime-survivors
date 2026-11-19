@@ -307,3 +307,30 @@ body.touch .sound-controls input[type=range] { min-height: 44px; }
   .choice .desc, .choice .changes { font-size: 11px; line-height: 1.3; }
   .panel:has(.choices) p { display: none; }
 }
+
+/* Major Incidents (feature 004) */
+.hud-incidents { display: grid; gap: 4px; margin: 2px 0 6px; max-width: min(520px, 100%); }
+.hud-incidents[hidden], .hud-link-warning[hidden] { display: none; }
+.incident-row { display: flex; align-items: center; gap: 8px; }
+.incident-name { color: var(--bad); font-weight: 600; white-space: nowrap; font-size: 13px; }
+.incident-bar { flex: 1; height: 8px; border-color: var(--bad); }
+.hud-link-warning { color: var(--warn); font-size: 13px; margin-bottom: 4px; }
+.loadout li.offline { color: var(--bad); opacity: 0.75; }
+@media (max-width: 600px) {
+  .incident-name { font-size: 11px; }
+}
+
+/* Safe-area insets exposed to scripts (edge pointers, feature 004). */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
+/* End screen on small phones: the Incidents row (feature 004) must still fit without scrolling. */
+@media (max-width: 420px), (max-height: 700px) {
+  .stats { font-size: 12px; gap: 2px 10px; margin: 6px 0; line-height: 1.35; }
+  .panel:has(.stats) h2 { font-size: 17px; margin-bottom: 6px; }
+  .panel:has(.stats) .btn-row { margin-top: 10px; }
+}

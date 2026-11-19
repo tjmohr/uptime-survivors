@@ -27,8 +27,19 @@ test('audio content: shipped data/audio.json is valid against data/game.json', a
   assert(r.ok, 'errors: ' + JSON.stringify(r.errors));
 });
 
-test('audio content: exactly the 10 effects, in a fixed order', () => {
-  assertEqual(EFFECT_NAMES, ['fire', 'pulse', 'damage', 'hit', 'defeat', 'pickup', 'levelUp', 'newThreat', 'win', 'loss']);
+test('audio content: exactly the 12 effects, in a fixed order (10 from feature 002, 2 from 004)', () => {
+  assertEqual(EFFECT_NAMES, ['fire', 'pulse', 'damage', 'hit', 'defeat', 'pickup', 'levelUp', 'newThreat', 'win', 'loss',
+    'incidentAlarm', 'incidentResolved']);
+});
+
+test('audio content: incident sounds and the incident music layer are validated (U7)', async () => {
+  errorAt(await check((a) => delete a.effects.incidentAlarm), 'effects.incidentAlarm');
+  errorAt(await check((a) => { a.effects.incidentResolved.voice.notes[0].ms = 3001; }), 'effects.incidentResolved.voice.notes', /at most 3000/);
+  const layer = (a) => a.music.layers.find((l) => l.trigger === 'incident');
+  errorAt(await check((a) => { layer(a).trigger = 'boss'; }), `music.layers[${7}].trigger`);
+  errorAt(await check((a) => { layer(a).joinLevel = 5; }), 'music.layers[7].joinLevel', /not both/);
+  errorAt(await check((a) => { delete layer(a).trigger; }), 'music.layers[7].joinLevel');
+  errorAt(await check((a) => { a.music.layers.push({ ...JSON.parse(JSON.stringify(layer(a))), id: 'second-alarm' }); }), 'music.layers', /exactly one layer/);
 });
 
 test('audio content: never throws on non-object input', async () => {

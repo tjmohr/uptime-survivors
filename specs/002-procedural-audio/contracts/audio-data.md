@@ -63,3 +63,10 @@ same error shape as `validateGameData` (`{ path, id, message }`), e.g.:
 
 Unknown fields are errors. Both files are validated before Start; all errors from both are listed on
 the existing "Game data has errors" screen.
+
+## Feature 004 additions
+
+Feature 004 (Major Incidents) adds two effects, `incidentAlarm` and `incidentResolved` (up to 3000 ms,
+always played — never dropped by the repeat interval or concurrency cap), and one music layer with
+`"trigger": "incident"` in place of `joinLevel`, which plays while any incident is active. See
+[specs/004-major-incidents/contracts/ui-audio.md](../../004-major-incidents/contracts/ui-audio.md).

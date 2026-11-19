@@ -123,9 +123,23 @@ function handleEvents() {
   // Sound reads the same events as the renderer and never changes the run (FR-017).
   const plan = director.consume(run.events, performance.now());
   if (plan.level !== null) audio.setLevel(plan.level);
+  audio.setIncident(plan.incidentActive);
   if (plan.runEnded) audio.stopMusic();
   for (const name of plan.effects) audio.play(name);
   if (plan.runEnded) audio.play(plan.runEnded);
+  // Major Incidents (feature 004): their banner comes before any other banner from the same step.
+  for (const ev of run.events) {
+    if (ev.type !== 'incident-arrived') continue;
+    const def = run.defs.incident.get(ev.incidentId);
+    screens.showBanner(`MAJOR INCIDENT — ${def.name} — ${def.concept}`, true);
+  }
+  for (const ev of run.events) {
+    if (ev.type === 'incident-resolved') {
+      screens.showBanner(`RESOLVED — ${run.defs.incident.get(ev.incidentId).name}`, true);
+    } else if (ev.type === 'link-down') {
+      screens.announce(`${run.defs.tool.get(ev.toolId).name} offline`);
+    }
+  }
   for (const ev of run.events) {
     if (ev.type === 'difficulty-up') {
       if (ev.level > 1) screens.showBanner(`Difficulty ${ev.level}`);
@@ -162,6 +176,20 @@ function touchButton(el, action) {
   });
   el.addEventListener('pointerleave', (ev) => { if (ev.pointerId === pressed) pressed = null; });
   el.addEventListener('click', () => { if (performance.now() >= suppressClickUntil) action(); });
+}
+
+// Where edge pointers may be drawn (feature 004): inside the safe area and below the HUD (which also
+// holds the touch Pause/Sound buttons). Measured at most every 250 ms.
+let insetCache = { at: -1e9, value: { top: 0, right: 0, bottom: 0, left: 0 } };
+function pointerInsets() {
+  const now = performance.now();
+  if (now - insetCache.at < 250) return insetCache.value;
+  const css = getComputedStyle(document.documentElement);
+  const px = (name) => parseFloat(css.getPropertyValue(name)) || 0;
+  const hud = document.getElementById('hud');
+  const hudBottom = hud.hidden ? 0 : hud.getBoundingClientRect().bottom;
+  insetCache = { at: now, value: { top: Math.max(px('--sat'), hudBottom), right: px('--sar'), bottom: px('--sab'), left: px('--sal') } };
+  return insetCache.value;
 }
 
 const joystickEl = document.getElementById('joystick');
@@ -236,7 +264,7 @@ async function boot() {
   audio = createAudio(audioData, Object.defineProperty(state.sound, 'forceFail', { value: params.audioFail, enumerable: false }));
   director = createDirector(audioData);
   hud = createHud(describeParams(params));
-  renderer = createRenderer(document.getElementById('game'), state.data, { showFps: params.fps });
+  renderer = createRenderer(document.getElementById('game'), state.data, { showFps: params.fps, getInsets: pointerInsets });
   input = createInput({
     canvas: document.getElementById('game'),
     isPlaying: () => state.run !== null && state.run.phase === 'playing',

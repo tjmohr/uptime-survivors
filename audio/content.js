@@ -2,12 +2,13 @@
 // Rules: specs/002-procedural-audio/data-model.md and contracts/audio-data.md.
 // Never throws; returns every error found as {path, id, message}, like engine/content.js.
 
-export const EFFECT_NAMES = ['fire', 'pulse', 'damage', 'hit', 'defeat', 'pickup', 'levelUp', 'newThreat', 'win', 'loss'];
+export const EFFECT_NAMES = ['fire', 'pulse', 'damage', 'hit', 'defeat', 'pickup', 'levelUp', 'newThreat', 'win', 'loss',
+  'incidentAlarm', 'incidentResolved']; // the last two added by feature 004 (Major Incidents)
 export const WAVES = ['sine', 'square', 'sawtooth', 'triangle', 'noise'];
 export const FILTER_TYPES = ['lowpass', 'highpass', 'bandpass'];
 export const STEPS_PER_BAR = 16;
 export const LEVELS = 20;
-const LONG_EFFECTS = new Set(['win', 'loss']);
+const LONG_EFFECTS = new Set(['win', 'loss', 'incidentAlarm', 'incidentResolved']);
 const EFFECT_MAX_MS = 1000;
 const LONG_EFFECT_MAX_MS = 3000;
 const ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -20,7 +21,8 @@ const VOICE_FIELDS = ['wave', 'gain', 'attackMs', 'filter', 'notes'];
 const FILTER_FIELDS = ['type', 'hz'];
 const NOTE_FIELDS = ['freq', 'toFreq', 'ms'];
 const MUSIC_FIELDS = ['bpmStart', 'bpmEnd', 'stepsPerBar', 'layers'];
-const LAYER_FIELDS = ['id', 'joinLevel', 'pattern', 'pitches', 'voice'];
+const LAYER_FIELDS = ['id', 'joinLevel', 'trigger', 'pattern', 'pitches', 'voice'];
+export const LAYER_TRIGGERS = ['incident']; // feature 004: a layer that plays while any Major Incident is active
 
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -153,6 +155,7 @@ export function validateAudioData(raw, gameData) {
     // A layer voice may last at most 4 steps (one beat) at bpmStart.
     const layerMaxMs = startOk ? stepMs(music.bpmStart) * 4 : undefined;
     const joins = new Set();
+    const triggers = [];
     if (!Array.isArray(music.layers) || music.layers.length === 0) {
       add('music.layers', null, "'layers' must be a non-empty list");
     } else {
@@ -165,7 +168,11 @@ export function validateAudioData(raw, gameData) {
         if (!id || !ID_PATTERN.test(id)) add(`${p}.id`, id, "'id' must be a kebab-case string");
         else if (seen.has(id)) add(`${p}.id`, id, `duplicate layer id '${id}'`);
         else seen.add(id);
-        if (num(layer, 'joinLevel', p, id, { min: 1, max: LEVELS, integer: true })) joins.add(layer.joinLevel);
+        if (layer.trigger !== undefined) {
+          if (!LAYER_TRIGGERS.includes(layer.trigger)) add(`${p}.trigger`, id, `'trigger' must be one of ${LAYER_TRIGGERS.join(', ')}`);
+          else triggers.push(id);
+          if (layer.joinLevel !== undefined) add(`${p}.joinLevel`, id, "a layer has either 'joinLevel' or 'trigger', not both");
+        } else if (num(layer, 'joinLevel', p, id, { min: 1, max: LEVELS, integer: true })) joins.add(layer.joinLevel);
         if (typeof layer.pattern !== 'string' || layer.pattern.length !== STEPS_PER_BAR || !/^[x.]+$/.test(layer.pattern)) {
           add(`${p}.pattern`, id, `'pattern' must be exactly ${STEPS_PER_BAR} characters of 'x' or '.'`);
         } else if (!layer.pattern.includes('x')) {
@@ -179,6 +186,7 @@ export function validateAudioData(raw, gameData) {
         voice(layer.voice, `${p}.voice`, id, layerMaxMs);
       });
       if (!joins.has(1)) add('music.layers', null, 'no music layer joins at level 1');
+      if (triggers.length !== 1) add('music.layers', null, `exactly one layer must have trigger 'incident' (found ${triggers.length})`);
       const enemies = isObject(gameData) && Array.isArray(gameData.enemies) ? gameData.enemies : [];
       const debuts = new Map();
       for (const e of enemies) {

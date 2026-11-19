@@ -67,7 +67,7 @@ test('determinism: pause and resume only act in the right phases', async () => {
   assertEqual(run.phase, 'levelup');
 });
 
-const ENGINE_FILES = ['rng', 'content', 'run', 'difficulty', 'spawner', 'behaviors', 'weapons', 'combat',
+const ENGINE_FILES = ['rng', 'content', 'run', 'difficulty', 'spawner', 'behaviors', 'weapons', 'combat', 'incidents',
   'progression', 'grid', 'hash'];
 
 test('determinism: engine source uses no Math.random, DOM, or network APIs', async () => {

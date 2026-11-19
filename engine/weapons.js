@@ -3,7 +3,7 @@
 
 export const PROJECTILE_RADIUS = 4;
 export const BARRIER_RADIUS = 10;
-const MAX_ENEMY_RADIUS = 40;
+const MAX_ENEMY_RADIUS = 80; // covers Major Incidents (feature 004); hits are still checked exactly
 const found = [];
 
 export function damageEnemy(run, enemy, amount) {
@@ -29,6 +29,7 @@ function nearestEnemy(run, range) {
   }
   return best;
 }
+
 
 function fireProjectile(run, toolId, angle, stats, pierce) {
   if (run.projectiles.length >= run.data.caps.projectiles) return;
@@ -132,6 +133,9 @@ function updateProjectiles(run, dt) {
 }
 
 export function updateWeapons(run, dt) {
-  for (const tool of run.engineer.tools) updateTool(run, tool, dt);
+  for (const tool of run.engineer.tools) {
+    if (tool.offlineUntil > run.elapsed) continue; // taken offline by Core Switch Failure (feature 004)
+    updateTool(run, tool, dt);
+  }
   updateProjectiles(run, dt);
 }

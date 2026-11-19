@@ -8,6 +8,7 @@ import { updateSpawner } from './spawner.js';
 import { updateBehaviors } from './behaviors.js';
 import { updateWeapons } from './weapons.js';
 import { moveEngineer, resolveDefeats, applyContactDamage, applyRegen, updatePickups } from './combat.js';
+import { createIncidentRecords, arriveIncidents, updateIncidents } from './incidents.js';
 
 export const STEPS_PER_SECOND = 60;
 export const STEP_SECONDS = 1 / STEPS_PER_SECOND;
@@ -20,7 +21,9 @@ export function createRun(data, { seed = 1, levelSeconds = null } = {}) {
       enemy: new Map(data.enemies.map((x) => [x.id, x])),
       tool: new Map(data.tools.map((x) => [x.id, x])),
       passive: new Map(data.passives.map((x) => [x.id, x])),
+      incident: new Map((data.incidents ?? []).map((x) => [x.id, x])),
     },
+    incidents: createIncidentRecords(data),
     grid: createGrid(64),
     seed: seed >>> 0,
     rng: createRng(seed),
@@ -80,10 +83,12 @@ export function step(run, input = { dx: 0, dy: 0 }) {
   while (run.difficultyLevel < level) {
     run.difficultyLevel += 1;
     run.events.push({ type: 'difficulty-up', level: run.difficultyLevel, debuts: debutsAt(run.data, run.difficultyLevel) });
+    arriveIncidents(run, run.difficultyLevel); // Major Incidents arrive on the step their level begins
   }
   run.stats.highestDifficulty = run.difficultyLevel;
 
   updateSpawner(run, dt);
+  updateIncidents(run, dt);
   updateBehaviors(run, dt); // also rebuilds the collision grid
   updateWeapons(run, dt);
   resolveDefeats(run);

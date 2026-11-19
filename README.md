@@ -38,6 +38,9 @@ Testing URLs:
 - **Terminal**: `node tests/run.mjs` (Node 18+), or on macOS without Node:
   `/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc -m tests/run.mjs`.
   Both exit with code 0 only if every test passes; zero tests found counts as a failure.
+- **Incident balance simulation** (slow: 10 full seeded runs): `jsc -m tests/balance/incidents.mjs -- s1`
+  (resolve times and rewards) or `-- s2` (difficulty with vs. without incidents); add a seed (`-- s1 83`)
+  to run one seed, e.g. several in parallel.
 - **Scripted browser checks** (needs Google Chrome): `python3 tests/browser/drive.py` runs the
   milestone, full-roster, and sound checks in headless Chrome against its own local server
   (`--only audio` for just the sound checks, `--only touch` for the touch/mobile checks, which drive
@@ -71,6 +74,24 @@ every direction. The page does not scroll, zoom, or refresh while you play, and 
 locking the screen pauses the game. On iPhone, the ring/silent switch can keep browser audio silent
 even when the game's sound is on. Touch controls appear automatically on phones and tablets, and on
 any other device as soon as its screen is touched; desktops that are never touched look unchanged.
+
+## Major Incidents
+
+Three times per run a **Major Incident** — a single, much larger enemy themed on a real network
+incident — arrives with a "MAJOR INCIDENT" banner, an alarm, and a health bar in the HUD (plus an
+arrow at the screen edge while it is off-screen):
+
+| Level | Incident | Real concept | What it does |
+|-------|----------|--------------|--------------|
+| 7 | **Route Leak** | BGP route leak | Releases bursts of small, fast enemies |
+| 12 | **Core Switch Failure** | Single point of failure in the network core | Very tough; warns, then knocks one of your tools offline for 4 s (never your last one) |
+| 18 | **Ransomware Outbreak** | Malware spreading laterally | Infects nearby enemies, making them tougher and faster until resolved |
+
+Ordinary enemies spawn at half rate while an incident is active during its arrival level (after that
+level the horde is back to full strength, even if the incident is still around). Resolve it and it drops one large,
+glowing telemetry pickup worth about a level-up. An incident you don't resolve stays — into later
+levels, even alongside the next one. The end screen lists each incident as resolved, unresolved, or
+not reached. All incident numbers live in `data/game.json` and are validated before Start.
 
 ## Sound
 
@@ -112,6 +133,9 @@ H1–H5) and a phone playtest (H6), the 5-player playtest (F10: SC-010, SC-011),
   cannot judge how it sounds. Nobody has listened to the sound yet (H1–H3 not run).
 - With `?levelSeconds=2`, difficulty rises 30× faster than levelling, so those runs usually end in a
   loss; use `?levelSeconds=0.5` to see the win screen quickly.
+- Major Incidents balance: in simulation, incidents make strong late-game runs much harder (I-S2) — an
+  open balance question. (An ignored incident used to halve spawning for as long as it lived; since
+  2026-11-19 the half rate applies only during its arrival level.)
 - Touch checks run in headless Chrome emulating phones; that is not Safari and not a real phone.
   Real-device checks (H1–H5) and the phone playtest (H6) have not been run. Performance on older or
   mid-range phones is only approximated (CPU throttled 4× on the dev Mac) and is unverified.
@@ -125,7 +149,8 @@ Scenarios are defined in
 [`specs/001-survivors-first-playable/quickstart.md`](specs/001-survivors-first-playable/quickstart.md)
 (M, F, SC rows) and [`specs/002-procedural-audio/quickstart.md`](specs/002-procedural-audio/quickstart.md)
 (A, B, H rows: sound), and [`specs/003-mobile-touch/quickstart.md`](specs/003-mobile-touch/quickstart.md)
-(U, T, and "Phone H" rows: touch and mobile). A checked task box is not evidence; this table is. Unrun checks stay visible
+(U, T, and "Phone H" rows: touch and mobile), and [`specs/004-major-incidents/quickstart.md`](specs/004-major-incidents/quickstart.md)
+("I-" rows: Major Incidents). A checked task box is not evidence; this table is. Unrun checks stay visible
 as "not run". M1/F1 record the test count when feature 001 was verified; the current count is in A1–A5.
 
 | # | Check | Result | Date | Environment | Evidence / notes |
@@ -192,21 +217,40 @@ as "not run". M1/F1 record the test count when feature 001 was verified; the cur
 | Phone H4 | Frame rate on real phones | not run |  |  | Open `?fps=1&seed=99`, play until ~300 enemies: ≥ 55 fps avg, no freeze > 0.25 s (SC-004). Older/mid-range phones: unverified. |
 | Phone H5 | Sound on real phones | not run |  |  | Starts on the Start tap; ♪ button mutes; note iPhone silent-switch behaviour. |
 | Phone H6 | Phone playtest (SC-008) | not run |  |  | 5 people on their own phones: ≥ 3 finish a first run without instructions and find the controls comfortable; no accidental choices. |
+| I-U1 | Incident data validation | pass | 2026-11-19 | jsc + Chrome 157 headless | Shipped incidents valid (levels 7/12/18); 19 broken copies rejected naming the incident and path, incl. duplicate arrival level, id clash with an enemy/tool, unknown behaviour kind/field/minion, link-down timing, radius not larger than every enemy, contact damage not above the strongest enemy at the arrival level (FR-007). |
+| I-U2 | Arrival | pass | 2026-11-19 | jsc | Arrive on the first step of levels 7/12/18 (also with `levelSeconds`), 720 u away, within 330 u by 2 s; records active; one event each; seeded direction. |
+| I-U3 | Behaviours | pass | 2026-11-19 | jsc | Route Leak bursts of 6, ≤ 18 alive, none at the enemy cap; Core Switch Failure warns 1.5 s ahead, 4 s outage, warnings ≥ 12 s apart, never the last tool, offline tools don't fire, restored on resolution; Ransomware ×1.5 health / ×1.3 speed once per enemy, cleared on resolution. |
+| I-U4 | Resolution and reward | pass | 2026-11-19 | jsc | One reward pickup with `rewardTelemetry` at the incident's position, no ordinary drop; collecting adds exactly its value; reward pickups survive the pickup cap; contact drains at the incident's rate. |
+| I-U5 | Lingering and overlap | pass | 2026-11-19 | jsc | Unresolved incident keeps its arrival strength; two active at once; ordinary spawning × 0.5 only while an incident is active during its arrival level (not compounded); full rate once that level ends or it is resolved. |
+| I-U6 | Run integrity | pass | 2026-11-19 | jsc | Full 20-level run (short levels) still ends in a win at `runLength` with all incidents reached; same seed + inputs → identical hash; pause/level-up freeze incidents. 133/133 tests pass. |
+| I-U7 | Incident sound | pass | 2026-11-19 | jsc | 12 effects validated; incident layer rules (`trigger` xor `joinLevel`, exactly one); alarm/resolution always play even with 8 effects sounding; incident-active flag. |
+| I-S1 | Resolve time and reward (SC-002) | pass | 2026-11-19 | `tests/balance/incidents.mjs`, 10 seeds, "focused play" bot (circles ~150 u from the incident), invincible, first upgrade each level-up | Route Leak 28–67 s, 8/10 in 30–60 s, reward ≈ 0.77–0.89 level-ups; Core Switch Failure 32–49 s, 10/10, ≈ 0.90–1.05; Ransomware Outbreak 46–55 s, 10/10, ≈ 1.00–1.13. Data: health 1200 / 2600 / 3400, rewards 72 / 160 / 260; softened 2026-11-19 (contact damage 30 / 35 / 45 per s; Ransomware infection radius 140, ×1.25 health, ×1.15 speed). A plain circling bot outran the incidents and resolved none, so "focused play" is part of this measurement. |
+| I-S2 | Difficulty with incidents (SC-003 proxy) | **fail** | 2026-11-19 | Same simulation, not invincible | Median end level unchanged (7 vs 7), but the 4 seeds that win without incidents all lose with them (end levels 18, 5, 7, 12, 18, 18, 6, 5, 6, 7 vs 20, 5, 7, 20, 20, 20, 6, 5, 6, 7). Tracing a loss showed the bot dying to the ordinary (partly infected) horde while circling the incident at close range with a fully maxed build — not to the incident itself: softening the incidents changed no outcome, a wider 260 u orbit stopped the bot resolving incidents at all (tools aim at the nearest enemy, so the horde shields the incident), and making projectile tools aim at incidents first (tried, then reverted) did not restore any win. So this proxy mostly measures the bot's tactics; the ≥ 7/10-in-7–14 rule also fails for the baseline (2/10). Needs a human playtest (I-H2). |
+| I-B1 | Arrival in the browser | pass | 2026-11-19 | Chrome 157 headless, `?levelSeconds=4` | Banner "MAJOR INCIDENT — Route Leak — BGP route leak", live-region announcement, alarm, HUD bar, edge pointer while off-screen, fully on screen ~1.7 s after arrival, incident music layer on. |
+| I-B2 | Behaviours in the browser | pass | 2026-11-19 | Chrome 157 headless | Leak bursts seen; Core Switch Failure warning shown twice and a tool shown OFFLINE; infected enemies seen. |
+| I-B3 | Resolution in the browser | pass | 2026-11-19 | Chrome 157 headless | "RESOLVED — Route Leak", resolution sound, one reward worth 72 drawn 2.5× size, collecting it raises telemetry, its pointer disappears. |
+| I-B4 | Overlap | pass | 2026-11-19 | Chrome 157 headless | Route Leak kept alive: two incidents, two HUD bars, pointer for the second, both behaviours running, incident music on. |
+| I-B5 | End summary | pass | 2026-11-19 | Chrome 157 headless | "Route Leak ✓ resolved · Core Switch Failure ✗ unresolved · Ransomware Outbreak — not reached". |
+| I-B6 | Phones and performance | pass | 2026-11-19 | Chrome 157 headless via DevTools Protocol, emulated safe areas | 390×844 and 844×390: incident panel and pointers inside the safe area, clear of the touch buttons; incident + ~300 enemies: 60 fps (p95 16.7 ms), CPU 4× slower: 60 fps. |
+| I-B7 | Regression | pass | 2026-11-19 | Chrome 157 headless; jsc | All feature 001–003 checks pass after two fixes found by this run: the roster check now ignores incidents when counting enemy types, and the end screen got a compact layout for small phones (the new Incidents row made it scroll at 360×640). |
+| I-H1 | Concepts recognisable (SC-006) | not run |  |  | Needs a reviewer to name each incident's concept from its banner. |
+| I-H2 | Incident playtest (SC-003, SC-007) | not run |  |  | Needs 5 players; especially to judge I-S2's finding that strong runs now tend to end at an incident. |
 
 ## Project layout
 
 ```text
 index.html, style.css, main.js   Page shell, styles, game loop and wiring
-engine/                          Pure game rules (no DOM, seeded randomness)
+engine/                          Pure game rules (no DOM, seeded randomness); incidents.js = Major Incidents
 ui/                              Canvas rendering, HUD, screens, keyboard + touch input, URL params;
                                  pure helpers joystick.js, tapguard.js, view.js; touchmode.js
 audio/                           Sound: data validation and event→sound decisions (pure), Web Audio synth
 data/game.json                   All enemies, tools, passives, difficulty, tuning
 data/audio.json                  All sound design: effects, music layers, tempos, volumes, limits
-tests/                           Test harness, browser + terminal runners, tests
+tests/                           Test harness, browser + terminal runners, tests; balance/ = incident simulation
 specs/001-survivors-first-playable/   Spec, plan, tasks, contracts, quickstart
 specs/002-procedural-audio/      Sound feature: spec, plan, tasks, contracts, quickstart
 specs/003-mobile-touch/          Touch and mobile feature: spec, plan, tasks, contracts, quickstart
+specs/004-major-incidents/       Major Incidents feature: spec, plan, tasks, contracts, quickstart
 ```
 
 ## License

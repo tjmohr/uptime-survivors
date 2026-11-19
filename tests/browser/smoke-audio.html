@@ -244,8 +244,9 @@ try {
     await play(60000, () => {
       const s = A();
       if (!s.musicPlaying) return;
-      samples.push({ level: s.level, bpm: s.bpm, layers: s.activeLayers.length });
-      if (s.activeLayers.length !== layersForLevel(data, s.level).length) ok = false;
+      samples.push({ level: s.level, bpm: s.bpm, layers: s.activeLayers.filter((id) => id !== 'incident-alarm').length });
+      // The incident layer (feature 004) comes and goes with Major Incidents; compare level layers only.
+      if (s.activeLayers.filter((id) => id !== 'incident-alarm').length !== layersForLevel(data, s.level).length) ok = false;
     });
     await until(() => G().run.phase === 'ended', 10000, 'run end');
     await sleep(300);

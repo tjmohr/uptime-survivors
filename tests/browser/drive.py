@@ -10,6 +10,7 @@ usage (from the repository root):
     python3 tests/browser/drive.py --only smoke2    # just one page
     python3 tests/browser/drive.py --only audio     # just the sound checks (B1–B8)
     python3 tests/browser/drive.py --only touch     # just the touch/mobile checks (T1–T10, feature 003)
+    python3 tests/browser/drive.py --only incident  # just the Major Incident checks (B1–B6, feature 004)
     python3 tests/browser/drive.py --chrome "/path/to/chrome"
 
 These checks drive the game with synthetic key presses and, for long checks, make the engineer
@@ -55,6 +56,12 @@ CHECKS += [
     ("tests/browser/smoke-audio.html?mode=b6", [], 60),
     ("tests/browser/smoke-audio.html?mode=data", [], 60),
     ("tests/browser/smoke-audio.html?mode=b7", AUTOPLAY, 60),
+    # Feature 004: Major Incidents (B1–B5)
+    ("tests/browser/smoke-incidents.html?mode=arrival", AUTOPLAY, 90),
+    ("tests/browser/smoke-incidents.html?mode=resolve", AUTOPLAY, 90),
+    ("tests/browser/smoke-incidents.html?mode=behaviors", AUTOPLAY, 150),
+    ("tests/browser/smoke-incidents.html?mode=overlap", AUTOPLAY, 120),
+    ("tests/browser/smoke-incidents.html?mode=summary", AUTOPLAY, 120),
 ]
 AUDIO_EXTENSIONS = (".wav", ".mp3", ".ogg", ".flac", ".m4a", ".aac", ".opus", ".webm", ".aif", ".aiff", ".mid", ".midi")
 FULL_RUN = ("tests/browser/smoke3.html?mode=full", [], 1500)

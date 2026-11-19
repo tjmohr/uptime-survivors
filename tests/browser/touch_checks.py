@@ -579,6 +579,69 @@ def check_hidden(c, base):
                                   "same handler and are covered by feature 001 F6 / 002 B3")}
 
 
+# ---------------------------------------------------------------- 004 B6 incidents on phones
+KEEP_ALIVE = f"""window.__keep = setInterval(() => {{ const r = {GAME}.run; if (!r) return;
+  r.engineer.maxUptime = 1e12; r.engineer.uptime = 1e12;
+  for (const e of r.enemies) if (e.incidentId !== undefined) e.health = e.maxHealth = 1e12;
+  if (r.phase === 'levelup') {{ r.offer && dispatchEvent(new KeyboardEvent('keydown', {{ code: 'Digit1' }})); }} }}, 20)"""
+
+INCIDENT_LAYOUT = """((insets) => {
+  const vw = innerWidth, vh = innerHeight, bad = [];
+  const rect = (el) => el.getBoundingClientRect();
+  const inside = (r) => r.left >= insets.left - 0.5 && r.top >= insets.top - 0.5 && r.right <= vw - insets.right + 0.5 && r.bottom <= vh - insets.bottom + 0.5;
+  const overlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  const panel = document.getElementById('hud-incidents');
+  if (panel.hidden || !panel.children.length) bad.push('incident panel not shown');
+  else if (!inside(rect(panel))) bad.push('incident panel outside safe area');
+  const buttons = [...document.querySelectorAll('.touch-btn')].map(rect);
+  for (const b of buttons) if (overlap(b, rect(panel))) bad.push('panel overlaps a touch button');
+  const ptrs = __uptimeSurvivors.render.pointers;
+  for (const p of ptrs) {
+    const pr = { left: p.x - 14, right: p.x + 14, top: p.y - 14, bottom: p.y + 14 };
+    if (!inside(pr)) bad.push(`pointer outside safe area at ${Math.round(p.x)},${Math.round(p.y)}`);
+    for (const b of buttons) if (overlap(pr, b)) bad.push('pointer overlaps a touch button');
+  }
+  return { bad, pointers: ptrs.length };
+})"""
+
+
+def check_incident_mobile(c, base):
+    notes, ok = [], True
+    for size in ((390, 844), (844, 390)):
+        load(c, base, query="seed=7&levelSeconds=4", size=size)
+        insets, how = set_insets(c, size)
+        start_by_tap(c)
+        c.evaluate(KEEP_ALIVE)
+        c.wait_for(f"{GAME}.run.enemies.some((e) => e.incidentId === 'route-leak')", 60)
+        time.sleep(0.15)
+        res = c.evaluate(INCIDENT_LAYOUT + f"({json.dumps(insets)})")
+        # Walk away from the incident so its pointer shows, then re-check.
+        c.evaluate(f"(() => {{ const r = {GAME}.run; const e = r.enemies.find((n) => n.incidentId === 'route-leak'); r.engineer.x = e.x - 1500; r.engineer.y = e.y - 300; }})()")
+        time.sleep(0.3)
+        res2 = c.evaluate(INCIDENT_LAYOUT + f"({json.dumps(insets)})")
+        bad = res["bad"] + res2["bad"]
+        ok &= not bad and res2["pointers"] >= 1
+        notes.append(f"{size[0]}×{size[1]} (safe-area {how}): " + ("panel and pointers inside the safe area, clear of the touch buttons"
+                     if not bad else json.dumps(bad)) + f"; pointers while off-screen: {res2['pointers']}")
+    # Performance: incident + ~300 enemies, phone size, normal speed and CPU 4× slower.
+    load(c, base, query="seed=99&levelSeconds=4", size=PHONE)
+    start_by_tap(c)
+    c.evaluate(KEEP_ALIVE)
+    c.wait_for(f"{GAME}.run.enemies.some((e) => e.incidentId === 'route-leak')", 60)
+    c.evaluate(f"({SPAWN})(300 - {GAME}.run.enemies.length)")
+    time.sleep(2)
+    m = c.evaluate(MEASURE)
+    c.throttle(4)
+    time.sleep(4)
+    mt = c.evaluate(MEASURE)
+    c.throttle(1)
+    perf_ok = m["fps"] >= 50 and m["p95"] < 34 and mt["fps"] >= 30 and mt["max"] <= 250
+    ok &= perf_ok
+    notes.append(f"perf with incident + {m['enemies']} enemies: avg {m['fps']:.0f} fps, p95 {m['p95']:.1f} ms; "
+                 f"CPU 4× slower: avg {mt['fps']:.0f} fps, max {mt['max']:.0f} ms, quality {mt['quality']}")
+    return {"B6": result(ok, "; ".join(notes))}
+
+
 CHECKS = [
     ("touch: T1 touch mode", check_touch_mode, 90),
     ("touch: T2 steering", check_steering, 90),
@@ -589,4 +652,5 @@ CHECKS = [
     ("touch: T7 rotation", check_rotation, 60),
     ("touch: T9 throttled performance", check_throttled_perf, 120),
     ("touch: T10 hidden page", check_hidden, 60),
+    ("incident: B6 phone layout + performance", check_incident_mobile, 240),
 ]

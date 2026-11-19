@@ -36,6 +36,7 @@ export function createDirector(audioData) {
   let lastPlayed = {};
   let playing = []; // end times of effects still sounding
   const counts = Object.fromEntries(EFFECT_NAMES.map((n) => [n, 0]));
+  let incidentsActive = 0; // feature 004: drives the incident music layer
 
   function accept(name, nowMs) {
     const last = lastPlayed[name];
@@ -48,11 +49,21 @@ export function createDirector(audioData) {
     return true;
   }
 
+  // Always played, like win/loss: exempt from minIntervalMs and the concurrency cap (feature 004 FR-017).
+  function always(name, nowMs) {
+    lastPlayed[name] = nowMs;
+    playing.push(nowMs + durations[name]);
+    counts[name] += 1;
+  }
+
   function consume(events, nowMs) {
     const wanted = new Set();
     let level = null;
     let runEnded = null;
+    const urgent = [];
     for (const ev of events) {
+      if (ev.type === 'incident-arrived') { urgent.push('incidentAlarm'); incidentsActive += 1; continue; }
+      if (ev.type === 'incident-resolved') { urgent.push('incidentResolved'); incidentsActive = Math.max(0, incidentsActive - 1); continue; }
       const effect = EVENT_TO_EFFECT[ev.type];
       if (effect) wanted.add(effect);
       else if (ev.type === 'difficulty-up') {
@@ -63,6 +74,10 @@ export function createDirector(audioData) {
       }
     }
     const effects = [];
+    for (const name of urgent) {
+      always(name, nowMs);
+      effects.push(name);
+    }
     if (runEnded) {
       // The end-of-run sound always plays (exactly one per run); it is not subject to the cap.
       lastPlayed[runEnded] = nowMs;
@@ -72,7 +87,7 @@ export function createDirector(audioData) {
     for (const name of PRIORITY) {
       if (wanted.has(name) && accept(name, nowMs)) effects.push(name);
     }
-    return { effects, level, runEnded };
+    return { effects, level, runEnded, incidentActive: incidentsActive > 0 };
   }
 
   return {
@@ -80,6 +95,7 @@ export function createDirector(audioData) {
     reset() {
       lastPlayed = {};
       playing = [];
+      incidentsActive = 0;
     },
     counts,
   };

@@ -20,7 +20,8 @@ const BEHAVIOR_FIELDS = {
   blink: ['intervalSeconds', 'distance'],
 };
 
-const TOP_FIELDS = ['schemaVersion', 'player', 'caps', 'progression', 'levelUp', 'enemies', 'tools', 'passives', 'difficulty'];
+const TOP_FIELDS = ['schemaVersion', 'player', 'caps', 'progression', 'levelUp', 'enemies', 'tools', 'passives', 'difficulty',
+  'incidentSpawnFactor', 'incidents'];
 const PLAYER_FIELDS = ['maxUptime', 'moveSpeed', 'pickupRadius', 'invulnerableSeconds', 'startingTool', 'maxTools'];
 const CAPS_FIELDS = ['enemies', 'pickups', 'projectiles'];
 const PROGRESSION_FIELDS = ['base', 'perLevel'];
@@ -35,6 +36,18 @@ const MULTIPLIERS = ['healthMultiplier', 'damageMultiplier', 'speedMultiplier'];
 const ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 export const LEVEL_COUNT = 20;
+
+// Major Incidents (feature 004, specs/004-major-incidents/data-model.md).
+export const INCIDENT_COUNT = 3;
+export const INCIDENT_MAX_RADIUS = 80;
+export const INCIDENT_FIELDS = ['id', 'name', 'concept', 'description', 'arrivalLevel', 'shape', 'color', 'radius', 'health',
+  'speed', 'entrySpeed', 'entryDistance', 'contactDamagePerSecond', 'rewardTelemetry', 'behavior'];
+export const INCIDENT_BEHAVIOR_FIELDS = {
+  leak: ['intervalSeconds', 'burst', 'maxAlive', 'minionType'],
+  'link-down': ['cooldownSeconds', 'warningSeconds', 'offlineSeconds'],
+  infect: ['intervalSeconds', 'radius', 'healthMultiplier', 'speedMultiplier'],
+};
+const TEXT_LIMITS = { name: 40, concept: 80, description: 200 };
 export const RANK_COUNT = 5;
 
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -277,6 +290,91 @@ function checkDifficulty(raw, c) {
   }
 }
 
+function checkIncidents(raw, c) {
+  if (raw.incidentSpawnFactor === undefined) c.add('incidentSpawnFactor', null, "missing required field 'incidentSpawnFactor'");
+  else c.num(raw, 'incidentSpawnFactor', '', null, { gt: 0, max: 1 }) || null;
+  for (const e of c.errors) if (e.path === '.incidentSpawnFactor') e.path = 'incidentSpawnFactor';
+
+  const list = raw.incidents;
+  if (!Array.isArray(list)) return c.add('incidents', null, 'incidents must be a list of exactly 3 Major Incidents');
+  if (list.length !== INCIDENT_COUNT) c.add('incidents', null, `incidents must have exactly ${INCIDENT_COUNT} entries`);
+
+  const enemies = Array.isArray(raw.enemies) ? raw.enemies.filter(isObject) : [];
+  const enemyIds = new Set(enemies.map((e) => e.id));
+  const otherIds = new Map();
+  for (const [key, label] of [['enemies', 'enemy'], ['tools', 'tool'], ['passives', 'passive']]) {
+    if (Array.isArray(raw[key])) for (const x of raw[key]) if (isObject(x) && typeof x.id === 'string') otherIds.set(x.id, label);
+  }
+  const maxEnemyRadius = Math.max(0, ...enemies.map((e) => (typeof e.radius === 'number' ? e.radius : 0)));
+  const ids = new Set();
+  const levels = new Map();
+
+  list.forEach((inc, i) => {
+    const path = `incidents[${i}]`;
+    if (!isObject(inc)) return c.add(path, null, 'incident must be an object');
+    const id = typeof inc.id === 'string' ? inc.id : null;
+    c.fields(inc, INCIDENT_FIELDS, path, id);
+    if (!id || !ID_PATTERN.test(id)) c.add(`${path}.id`, id, 'id must be kebab-case text');
+    else if (ids.has(id)) c.add(`${path}.id`, id, `duplicate incident id '${id}'`);
+    else if (otherIds.has(id)) c.add(`${path}.id`, id, `id '${id}' is already used by a ${otherIds.get(id)}`);
+    else ids.add(id);
+    for (const [k, max] of Object.entries(TEXT_LIMITS)) {
+      if (c.str(inc, k, path, id) && inc[k].length > max) c.add(`${path}.${k}`, id, `'${k}' must be at most ${max} characters`);
+    }
+    if (c.num(inc, 'arrivalLevel', path, id, { min: 2, max: LEVEL_COUNT, integer: true })) {
+      if (levels.has(inc.arrivalLevel)) c.add(`${path}.arrivalLevel`, id, `arrival level ${inc.arrivalLevel} is already used by '${levels.get(inc.arrivalLevel)}'`);
+      else levels.set(inc.arrivalLevel, id);
+    }
+    if (!SHAPES.includes(inc.shape)) c.add(`${path}.shape`, id, `shape must be one of ${SHAPES.join(', ')}`);
+    if (typeof inc.color !== 'string' || !COLOR_PATTERN.test(inc.color)) c.add(`${path}.color`, id, 'color must look like #rrggbb');
+    if (c.num(inc, 'radius', path, id, { gt: 0, max: INCIDENT_MAX_RADIUS }) && !(inc.radius > maxEnemyRadius)) {
+      c.add(`${path}.radius`, id, `radius must be larger than every ordinary enemy (largest is ${maxEnemyRadius})`);
+    }
+    for (const k of ['health', 'speed', 'contactDamagePerSecond']) c.num(inc, k, path, id, { gt: 0 });
+    if (c.num(inc, 'entrySpeed', path, id, { gt: 0 }) && typeof inc.speed === 'number' && inc.entrySpeed < inc.speed) {
+      c.add(`${path}.entrySpeed`, id, "'entrySpeed' must be at least 'speed'");
+    }
+    c.num(inc, 'entryDistance', path, id, { gt: 0, lt: 720 });
+    c.num(inc, 'rewardTelemetry', path, id, { min: 1, integer: true });
+
+    // FR-007: contact hurts more than any ordinary enemy at the arrival level.
+    const row = Array.isArray(raw.difficulty) ? raw.difficulty[inc.arrivalLevel - 1] : null;
+    if (isObject(row) && typeof row.damageMultiplier === 'number' && typeof inc.contactDamagePerSecond === 'number') {
+      const strongest = Math.max(0, ...enemies.map((e) => (typeof e.contactDamagePerSecond === 'number' ? e.contactDamagePerSecond : 0)))
+        * row.damageMultiplier;
+      if (!(inc.contactDamagePerSecond > strongest)) {
+        c.add(`${path}.contactDamagePerSecond`, id,
+          `must be greater than the strongest ordinary enemy at level ${inc.arrivalLevel} (${Math.round(strongest * 100) / 100}/s)`);
+      }
+    }
+
+    const b = inc.behavior;
+    const bp = `${path}.behavior`;
+    if (!isObject(b)) return c.add(bp, id, 'behavior must be an object with a kind');
+    if (!(b.kind in INCIDENT_BEHAVIOR_FIELDS)) return c.add(`${bp}.kind`, id, `unknown incident behavior kind '${b.kind}'`);
+    c.fields(b, ['kind', ...INCIDENT_BEHAVIOR_FIELDS[b.kind]], bp, id);
+    if (b.kind === 'leak') {
+      c.num(b, 'intervalSeconds', bp, id, { gt: 0 });
+      const burstOk = c.num(b, 'burst', bp, id, { min: 1, integer: true });
+      if (c.num(b, 'maxAlive', bp, id, { min: 1, integer: true }) && burstOk && b.maxAlive < b.burst) {
+        c.add(`${bp}.maxAlive`, id, "'maxAlive' must be at least 'burst'");
+      }
+      if (b.minionType === undefined) c.add(`${bp}.minionType`, id, "missing required field 'minionType'");
+      else if (!enemyIds.has(b.minionType)) c.add(`${bp}.minionType`, id, `unknown enemy '${b.minionType}'`);
+    } else if (b.kind === 'link-down') {
+      const ok = ['cooldownSeconds', 'warningSeconds', 'offlineSeconds'].map((k) => c.num(b, k, bp, id, { gt: 0 }));
+      if (ok.every(Boolean) && !(b.cooldownSeconds > b.warningSeconds + b.offlineSeconds)) {
+        c.add(`${bp}.cooldownSeconds`, id, "'cooldownSeconds' must be greater than 'warningSeconds' + 'offlineSeconds'");
+      }
+    } else if (b.kind === 'infect') {
+      c.num(b, 'intervalSeconds', bp, id, { gt: 0 });
+      c.num(b, 'radius', bp, id, { gt: 0 });
+      c.num(b, 'healthMultiplier', bp, id, { min: 1 });
+      c.num(b, 'speedMultiplier', bp, id, { min: 1 });
+    }
+  });
+}
+
 export function validateGameData(raw) {
   const c = createChecker();
   try {
@@ -291,6 +389,7 @@ export function validateGameData(raw) {
     checkEnemies(raw, c);
     checkToolsAndPassives(raw, c);
     checkDifficulty(raw, c);
+    checkIncidents(raw, c);
   } catch (err) {
     c.add('', null, `validator error: ${err && err.message}`);
   }

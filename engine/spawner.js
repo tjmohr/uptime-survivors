@@ -42,10 +42,21 @@ export function spawnEnemy(run, typeId, x, y, row, { scale = 1, generation = 0 }
 export function updateSpawner(run, dt) {
   const row = rowFor(run.data, run.difficultyLevel);
   const e = run.engineer;
-  run.spawnAccumulator += row.spawnPerSecond * dt;
+  // Major Incidents (feature 004): ordinary spawning slows while an incident is active during its
+  // own arrival level (not afterwards, so ignoring an incident never makes the run easier), and
+  // incidents themselves never count toward the enemy cap.
+  let incidents = 0;
+  let focus = false;
+  for (const n of run.enemies) {
+    if (n.incidentId === undefined) continue;
+    incidents++;
+    if (run.defs.incident.get(n.incidentId).arrivalLevel === run.difficultyLevel) focus = true;
+  }
+  const factor = focus ? run.data.incidentSpawnFactor ?? 1 : 1;
+  run.spawnAccumulator += row.spawnPerSecond * factor * dt;
   while (run.spawnAccumulator >= 1) {
     run.spawnAccumulator -= 1;
-    if (run.enemies.length >= run.data.caps.enemies) continue; // over the cap: skip, never queue
+    if (run.enemies.length - incidents >= run.data.caps.enemies) continue; // over the cap: skip, never queue
     const typeId = pickWeighted(run.rng, row.mix);
     const angle = run.rng.next() * Math.PI * 2;
     spawnEnemy(run, typeId, e.x + Math.cos(angle) * SPAWN_DISTANCE, e.y + Math.sin(angle) * SPAWN_DISTANCE, row);
