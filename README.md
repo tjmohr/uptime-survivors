@@ -158,3 +158,8 @@ tests/                           Test harness, browser + terminal runners, tests
 specs/001-survivors-first-playable/   Spec, plan, tasks, contracts, quickstart
 specs/002-procedural-audio/      Sound feature: spec, plan, tasks, contracts, quickstart
 ```
+
+## License
+
+Copyright (c) 2026 TJ M. All rights reserved. No permission is granted to use, copy, modify, or
+distribute this work without written permission — see [LICENSE](LICENSE).
