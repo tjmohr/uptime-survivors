@@ -642,6 +642,106 @@ def check_incident_mobile(c, base):
     return {"B6": result(ok, "; ".join(notes))}
 
 
+# ---------------------------------------------------------------- GB5 Field Guide on phones (feature 005)
+GUIDE_EXTRA = """(() => { const bad = []; const list = document.getElementById('guide-list');
+  for (const a of list.querySelectorAll('.guide-entry')) {
+    if (a.scrollWidth > a.clientWidth + 1) bad.push('entry clipped: ' + a.querySelector('.guide-name').textContent); }
+  for (const el of document.querySelectorAll('#guide-back, [role=tab]')) { const r = el.getBoundingClientRect();
+    if (r.width < 44 - 0.5 || r.height < 44 - 0.5) bad.push(`${el.id} ${r.width.toFixed(0)}×${r.height.toFixed(0)} < 44`); }
+  return bad; })()"""
+
+
+def open_guide_by_tap(c):
+    """From play: tap ❚❚, then (after the tap guard) tap Field Guide; returns ms from the tap's click (finger
+    lifted) to the guide's entries being in the page. The synthetic finger hold is not the game's time."""
+    px, py = center(c, "#touch-pause")
+    c.tap(px, py)
+    c.wait_for(f"{GAME}.run.phase === 'paused' && !!document.getElementById('open-guide')", 3)
+    guard_ready(c)
+    gx, gy = center(c, "#open-guide")
+    c.evaluate("window.__guideShown = null; window.__guideObs = new MutationObserver(() => {"
+               " if (!__guideShown && document.querySelector('#guide-list .guide-entry')) __guideShown = performance.now(); });"
+               " __guideObs.observe(document.getElementById('overlay'), { childList: true, subtree: true });"
+               " window.__tapAt = null; addEventListener('click', () => { if (window.__tapAt === null) window.__tapAt = performance.now(); }, true);")
+    c.tap(gx, gy)
+    c.wait_for("!!window.__guideShown", 3)
+    return c.evaluate("__guideShown - __tapAt")
+
+
+def check_guide_mobile(c, base):
+    notes, ok = [], True
+
+    def expect(cond, text):
+        nonlocal ok
+        ok &= bool(cond)
+        notes.append(("ok " if cond else "FAIL ") + text)
+
+    for size in [(360, 640), (640, 360)]:
+        load(c, base, query="seed=4&levelSeconds=4", size=size)
+        insets, how = set_insets(c, size)
+        start_by_tap(c)
+        invincible(c)
+        time.sleep(0.3)
+        label = f"{size[0]}×{size[1]} (safe-area {how})"
+        # Pause screen with its three buttons still fits.
+        px, py = center(c, "#touch-pause")
+        c.tap(px, py)
+        c.wait_for(f"{GAME}.run.phase === 'paused' && !!document.getElementById('open-guide')", 3)
+        time.sleep(0.2)
+        bad = c.evaluate(FIT_PROBE + f"({json.dumps(insets)})")
+        expect(not bad, f"{label} pause screen fits: {bad or 'Resume, Field Guide, Quit, sound controls inside'}")
+        guard_ready(c)
+        rx, ry = button_center(c, "Resume")
+        c.tap(rx, ry)
+        c.wait_for(f"{GAME}.run.phase === 'playing'", 3)
+        invincible(c)
+        open_guide_by_tap(c)
+        time.sleep(0.2)
+        bad = c.evaluate(FIT_PROBE + f"({json.dumps(insets)})") + c.evaluate(GUIDE_EXTRA)
+        expect(not bad, f"{label} guide fits, no clipped entry, Back/tabs ≥ 44×44: {bad or 'ok'}")
+        # Back tapped right after opening (< 500 ms) is ignored; after the guard it works.
+        bx, by = center(c, "#guide-back")
+        c.tap(bx, by)
+        time.sleep(0.15)
+        expect(c.evaluate("!!document.getElementById('guide-list')"), f"{label} Back within 500 ms of opening ignored")
+        # Scroll the list by dragging; the page must not move and nothing gets selected.
+        guard_ready(c)
+        lx, ly = center(c, "#guide-list")
+        hash0 = c.evaluate(f"import('/engine/hash.js').then(({{ hashRun }}) => hashRun({GAME}.run))")
+        c.touch("touchStart", [(lx, ly + 80, 1)])
+        for k in range(1, 11):
+            c.touch("touchMove", [(lx, ly + 80 - k * 16, 1)])
+            time.sleep(0.02)
+        c.touch("touchEnd", [])
+        time.sleep(0.4)
+        st = c.evaluate("[document.getElementById('guide-list').scrollTop, scrollY, document.documentElement.scrollTop, "
+                        "document.querySelector('[role=tab][aria-selected=true]').id, !!document.getElementById('guide-list')]")
+        expect(st[0] > 0 and st[1] == 0 and st[2] == 0, f"{label} drag scrolls the list ({st[0]:.0f}px), page stays put")
+        expect(st[3] == "tab-problems" and st[4], f"{label} the drag selected nothing (still on Network problems)")
+        # Held finger: a second finger tapping Back is ignored until all fingers lift.
+        c.touch("touchStart", [(lx, ly, 1)])
+        c.touch("touchStart", [(lx, ly, 1), (bx, by, 2)])
+        c.touch("touchEnd", [(bx, by, 2)])
+        time.sleep(0.2)
+        expect(c.evaluate("!!document.getElementById('guide-list')"), f"{label} Back tapped while another finger is down: ignored")
+        c.touch("touchEnd", [])
+        time.sleep(0.05)
+        guard_ready(c)
+        c.tap(bx, by)
+        c.wait_for("!!document.getElementById('open-guide')", 3)
+        hash1 = c.evaluate(f"import('/engine/hash.js').then(({{ hashRun }}) => hashRun({GAME}.run))")
+        expect(phase(c) == "paused" and hash0 == hash1, f"{label} Back after lifting → pause screen; run unchanged")
+    # Opening time on a 4× slower CPU (plan performance goal < 100 ms).
+    load(c, base, query="seed=4")
+    start_by_tap(c)
+    invincible(c)
+    c.throttle(4)
+    ms = open_guide_by_tap(c)
+    c.throttle(1)
+    expect(ms < 100, f"390×844, CPU 4× slower: guide entries shown {ms:.0f} ms after the tap registered (< 100)")
+    return {"GB5": result(ok, "; ".join(notes))}
+
+
 CHECKS = [
     ("touch: T1 touch mode", check_touch_mode, 90),
     ("touch: T2 steering", check_steering, 90),
@@ -653,4 +753,5 @@ CHECKS = [
     ("touch: T9 throttled performance", check_throttled_perf, 120),
     ("touch: T10 hidden page", check_hidden, 60),
     ("incident: B6 phone layout + performance", check_incident_mobile, 240),
+    ("touch: GB5 Field Guide on phones (guide)", check_guide_mobile, 180),
 ]

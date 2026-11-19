@@ -56,6 +56,7 @@ export function createRun(data, { seed = 1, levelSeconds = null } = {}) {
       passives: [],
     },
     enemies: [],
+    encountered: [], // enemy types and incidents met this run, in order (feature 005)
     projectiles: [],
     pickups: [],
     events: [],

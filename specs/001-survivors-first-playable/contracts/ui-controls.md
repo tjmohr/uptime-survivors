@@ -10,6 +10,7 @@
 | Level-up | 1, 2, 3 (or Tab + Enter, or mouse click) | Choose upgrade |
 | Paused | Esc or P, or Resume button | Resume |
 | Paused | Quit to Title button | End run, return to title |
+| Field Guide (feature 005) | Esc or P, or Back button | Return to the pause screen (never resumes) |
 | End screen | Buttons: New Run, Replay Seed | Start new run / same seed |
 
 Automatic pause when the page is hidden or the window loses focus (FR-004).
@@ -27,7 +28,7 @@ first button. Menu buttons are native `<button>` elements.
 | HUD (playing) | Uptime % and bar; telemetry bar and engineer level; "Difficulty N / 20" and seconds left in level; total time; owned tools and passives with ranks (FR-028); test-setting label if any URL parameter is active |
 | Level-up | Up to 3 choices: name, "Rank a → b" or "New", description, exact stat changes (FR-015) |
 | Banner | "Difficulty N" on each level; "New threat: <name> — <concept>" on debut |
-| Paused | Resume, Quit to Title |
+| Paused | Resume, Quit to Title (feature 005 adds a **Field Guide** button between them; see `specs/005-field-guide/contracts/ui-guide.md`) |
 | End | Win/Loss, time survived, difficulty reached, enemies defeated, engineer level, tools/passives with ranks, seed; New Run, Replay Seed (FR-003) |
 
 ## Accessibility

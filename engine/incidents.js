@@ -57,6 +57,7 @@ export function arriveIncidents(run, level) {
       pendingTool: null,
     };
     run.enemies.push(inc);
+    if (run.encountered && !run.encountered.includes(def.id)) run.encountered.push(def.id);
     record.state = 'active';
     record.arrivedAt = run.elapsed;
     run.events.push({ type: 'incident-arrived', incidentId: def.id, x: inc.x, y: inc.y });

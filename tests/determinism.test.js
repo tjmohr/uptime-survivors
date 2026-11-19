@@ -128,3 +128,17 @@ test('determinism: a director reading events never changes the run (A5, FR-017)'
   assertEqual(hashRun(run), hashRun(plain));
   assert(Object.values(director.counts).some((n) => n > 0), 'director heard nothing');
 });
+
+// Feature 005 (G6): the Field Guide's encounter record is deterministic and part of the hash.
+test('determinism: run.encountered is identical for identical runs and is hashed', async () => {
+  const data = await loadGameData();
+  const inputs = recordedInputs(3600);
+  const a = play(data, 11, inputs);
+  const b = play(data, 11, inputs);
+  assert(a.encountered.length > 0, 'something was met in a minute of play');
+  assertEqual(a.encountered.join('|'), b.encountered.join('|'));
+  assertEqual(hashRun(a), hashRun(b));
+  const before = hashRun(a);
+  a.encountered.push('ddos-botnet-test');
+  assert(hashRun(a) !== before, 'changing encountered changes the hash');
+});

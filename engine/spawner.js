@@ -36,6 +36,8 @@ export function spawnEnemy(run, typeId, x, y, row, { scale = 1, generation = 0 }
     dead: false,
   };
   run.enemies.push(enemy);
+  // Field Guide (feature 005): a type counts as met the first time one enters the game.
+  if (run.encountered && !run.encountered.includes(typeId)) run.encountered.push(typeId);
   return enemy;
 }
 

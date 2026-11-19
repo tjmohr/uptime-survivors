@@ -4,6 +4,7 @@
 import { orbitPositions, PROJECTILE_RADIUS, BARRIER_RADIUS } from '../engine/weapons.js';
 import { ENGINEER_RADIUS } from '../engine/behaviors.js';
 import { viewScale, viewHalfShort } from './view.js';
+import { shapePoints, TOOL_COLORS } from './icons.js';
 
 // The camera shows at least VIEW_RADIUS (660) game units across half the screen diagonal on desktop,
 // kept below the engine's spawn distance (720) so enemies appear off-screen; on small screens it zooms
@@ -23,31 +24,17 @@ const COLORS = {
   engineer: '#e0f2fe',
   engineerHit: '#f87171',
   pickup: '#4ade80',
-  barrier: '#22d3ee',
-  pulse: '#a78bfa',
+  barrier: TOOL_COLORS['firewall-rule'],
+  pulse: TOOL_COLORS['ansible-playbook'],
 };
-const PROJECTILE_COLORS = { ping: '#e2e8f0', 'load-balancer': '#a3e635' };
+const PROJECTILE_COLORS = TOOL_COLORS;
 
 function shapePath(ctx, shape, r) {
   ctx.beginPath();
-  const poly = (n, rot) => {
-    for (let i = 0; i < n; i++) {
-      const a = rot + (i * Math.PI * 2) / n;
-      const x = Math.cos(a) * r;
-      const y = Math.sin(a) * r;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-  };
-  switch (shape) {
-    case 'square': poly(4, Math.PI / 4); break;
-    case 'triangle': poly(3, -Math.PI / 2); break;
-    case 'hexagon': poly(6, 0); break;
-    case 'diamond': poly(4, 0); break;
-    case 'octagon': poly(8, Math.PI / 8); break;
-    default: ctx.arc(0, 0, r, 0, Math.PI * 2);
-  }
+  const pts = shapePoints(shape, r); // shared with the Field Guide icons (feature 005)
+  if (!pts) return ctx.arc(0, 0, r, 0, Math.PI * 2);
+  pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+  ctx.closePath();
 }
 
 // Pre-renders a glowing outlined shape once; drawn as an image every frame (no per-frame shadowBlur).

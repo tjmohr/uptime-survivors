@@ -45,7 +45,7 @@ Testing URLs:
   milestone, full-roster, and sound checks in headless Chrome against its own local server
   (`--only audio` for just the sound checks, `--only touch` for the touch/mobile checks, which drive
   Chrome over its DevTools Protocol with real touch input and phone-sized screens); add
-  `--full-run` for the real-time 20-minute run. They use synthetic key presses and, for long runs,
+  `--full-run` for the real-time 20-minute run; `--only guide` runs the Field Guide checks. They use synthetic key presses and, for long runs,
   test-only invincibility — they complement, not replace, a human playthrough.
 
 ## Controls
@@ -58,6 +58,8 @@ Testing URLs:
 | Level-up | **1**, **2**, **3**, or click / Tab + Enter |
 | End screen | **New Run** (new seed) or **Replay Seed** (same seed) |
 | Any screen | **M** to mute / unmute all sound |
+| Paused | **Field Guide** button: an index of every network problem, tool, and passive (Esc, P, or **Back** returns to the pause screen) |
+| Field Guide | **←/→** (or click / tap) to switch between *Network problems* and *Tools & passives*; **Tab** moves through the entries |
 | Paused | **Sound** on/off button, **Music** and **Effects** volume sliders (0–100% in 10% steps; arrow keys, mouse, or touch) |
 
 **Touch (phones and tablets):** touch anywhere and drag to steer — a joystick appears under your
@@ -93,6 +95,23 @@ glowing telemetry pickup worth about a level-up. An incident you don't resolve s
 levels, even alongside the next one. The end screen lists each incident as resolved, unresolved, or
 not reached. All incident numbers live in `data/game.json` and are validated before Start.
 
+## Field Guide
+
+Pause (Esc, P, or ❚❚) and choose **Field Guide** for an index of everything in the game, with the same
+icons you see on the play field:
+
+- **Network problems**: the five enemy types in the order they appear (levels 1, 4, 8, 12, 16), then the
+  three Major Incidents with their arrival level — each with its name, the real networking concept
+  behind it, and a description. Problems you have not met yet in this run are **locked** ("???", a grey
+  outline, "Not yet encountered"); an entry unlocks as soon as that problem enters the game (even
+  off-screen), and every new run starts locked again. Nothing is saved between runs.
+- **Tools & passives**: all four tools and both passives with their concept and description. Owned ones
+  show their rank (of 5), the exact stats the game is using at that rank, and a **Next rank** line with
+  only the stats that would change — the same numbers and wording as the level-up screen. Unowned ones
+  say "Not owned" and show rank 1; a tool knocked out by Core Switch Failure says **OFFLINE**.
+
+The game stays paused the whole time, and opening the guide changes nothing in the run.
+
 ## Sound
 
 Nothing plays until you press **Start**. Then a minimal techno pulse plays behind the action: it
@@ -120,7 +139,9 @@ synthesized sound effects and music (feature 002). Automated and scripted-browse
 Verification), and touch play on phones and tablets (feature 003) is checked in emulated phones with
 real touch input. **Still outstanding:** a human playthrough, checks on real phones (feature 003
 H1–H5) and a phone playtest (H6), the 5-player playtest (F10: SC-010, SC-011), a human review of the networking descriptions (SC-007), human listening tests for the sound
-(H1–H3), and checks in browsers other than Chrome.
+(H1–H3), Field Guide checks with a real screen reader, on real phones, and a playtest (GH1–GH3), and
+checks in browsers other than Chrome. The Field Guide (feature 005) passes its automated and scripted
+checks.
 
 ### Known limits
 
@@ -150,7 +171,8 @@ Scenarios are defined in
 (M, F, SC rows) and [`specs/002-procedural-audio/quickstart.md`](specs/002-procedural-audio/quickstart.md)
 (A, B, H rows: sound), and [`specs/003-mobile-touch/quickstart.md`](specs/003-mobile-touch/quickstart.md)
 (U, T, and "Phone H" rows: touch and mobile), and [`specs/004-major-incidents/quickstart.md`](specs/004-major-incidents/quickstart.md)
-("I-" rows: Major Incidents). A checked task box is not evidence; this table is. Unrun checks stay visible
+("I-" rows: Major Incidents), and [`specs/005-field-guide/quickstart.md`](specs/005-field-guide/quickstart.md)
+(G, GB, GH rows: Field Guide). A checked task box is not evidence; this table is. Unrun checks stay visible
 as "not run". M1/F1 record the test count when feature 001 was verified; the current count is in A1–A5.
 
 | # | Check | Result | Date | Environment | Evidence / notes |
@@ -235,6 +257,16 @@ as "not run". M1/F1 record the test count when feature 001 was verified; the cur
 | I-B7 | Regression | pass | 2026-11-19 | Chrome 157 headless; jsc | All feature 001–003 checks pass after two fixes found by this run: the roster check now ignores incidents when counting enemy types, and the end screen got a compact layout for small phones (the new Incidents row made it scroll at 360×640). |
 | I-H1 | Concepts recognisable (SC-006) | not run |  |  | Needs a reviewer to name each incident's concept from its banner. |
 | I-H2 | Incident playtest (SC-003, SC-007) | not run |  |  | Needs 5 players; especially to judge I-S2's finding that strong runs now tend to end at an incident. |
+| G1–G6 | Field Guide unit tests (content, locking, stats for every rank, icons, no change, determinism) | pass | 2026-11-19 | jsc | 146/146 tests pass, including 12 new guide tests and the G6 determinism test: every tool and passive at ranks 1–5 matches the engine's rank tables and the level-up wording; building the guide leaves `hashRun` unchanged mid-run with two incidents and an offline tool. |
+| GB1 | Guide opens with problems and locking | pass | 2026-11-19 | Chrome 157 headless, `?levelSeconds=4` | Pause shows Resume / Field Guide / Quit to Title; at level 8 the guide shows 5 enemies + 3 incidents, 8/8 matching the data or locked exactly as `run.encountered` says (met: Dropped Packet, Latency Spike, Route Leak); SVG shapes match the play-field vertices. |
+| GB2 | Keyboard, Esc / P / Back, nothing changes | pass | 2026-11-19 | Chrome 157 headless | Arrows / Home / End switch tabs; Tab reaches all 8 entries with nothing else after the tabs (SC-001); Esc, P, and Back each return to the pause screen with focus on Field Guide; tick and `hashRun` unchanged after 3 s open and three open/close cycles. |
+| GB3 | Tools & passives numbers | pass | 2026-11-19 | Chrome 157 headless | Ping rank 3, Load Balancer rank 1 OFFLINE, Bandwidth Upgrade rank 5 (no next line), three "Not owned" at rank 1 — every line equals the model and level-up wording, e.g. "Next rank: Damage 15 → 18 · Cooldown 0.6 s → 0.5 s". |
+| GB4 | Accessibility attributes | pass | 2026-11-19 | Chrome 157 headless | tablist / 2 tabs / tabpanel with aria-controls, aria-selected, aria-labelledby; entries labelled by name; icons aria-hidden; no locked names or descriptions in the guide's DOM. |
+| GB5 | Phones | pass | 2026-11-19 | Chrome 157 headless via DevTools Protocol, emulated safe areas, real touch input | 360×640 and 640×360: pause screen (three buttons + sound) and guide fit inside the safe area, no clipped entry, Back/tabs ≥ 44×44; a drag scrolls the list (145 px) while the page stays put and selects nothing; Back ignored within 500 ms and while another finger is down, works after lifting; run unchanged. CPU 4× slower: entries shown 4 ms after the tap registers. |
+| GB6 | Regression (all features) | pass | 2026-11-19 | Chrome 157 headless; jsc | Full `python3 tests/browser/drive.py`: 46/46 checks pass (features 001–005, sound, touch, incidents, guide) after the pause-screen button and the shared shape code; `jsc -m tests/run.mjs` 146/146. |
+| GH1 | Screen reader (VoiceOver) | not run |  |  | Needs a person with VoiceOver on macOS or iOS. |
+| GH2 | Real phones | not run |  |  | Needs the feature 003 iPhone and Android. |
+| GH3 | Field Guide playtest (SC-006) | not run |  |  | Needs 5 players. |
 
 ## Project layout
 
@@ -242,7 +274,8 @@ as "not run". M1/F1 record the test count when feature 001 was verified; the cur
 index.html, style.css, main.js   Page shell, styles, game loop and wiring
 engine/                          Pure game rules (no DOM, seeded randomness); incidents.js = Major Incidents
 ui/                              Canvas rendering, HUD, screens, keyboard + touch input, URL params;
-                                 pure helpers joystick.js, tapguard.js, view.js; touchmode.js
+                                 pure helpers joystick.js, tapguard.js, view.js; touchmode.js;
+                                 Field Guide model guide.js, icons.js, stattext.js (pure)
 audio/                           Sound: data validation and event→sound decisions (pure), Web Audio synth
 data/game.json                   All enemies, tools, passives, difficulty, tuning
 data/audio.json                  All sound design: effects, music layers, tempos, volumes, limits
@@ -251,6 +284,7 @@ specs/001-survivors-first-playable/   Spec, plan, tasks, contracts, quickstart
 specs/002-procedural-audio/      Sound feature: spec, plan, tasks, contracts, quickstart
 specs/003-mobile-touch/          Touch and mobile feature: spec, plan, tasks, contracts, quickstart
 specs/004-major-incidents/       Major Incidents feature: spec, plan, tasks, contracts, quickstart
+specs/005-field-guide/           Field Guide feature: spec, plan, tasks, contracts, quickstart
 ```
 
 ## License

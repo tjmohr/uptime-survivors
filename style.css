@@ -334,3 +334,74 @@ body.touch .sound-controls input[type=range] { min-height: 44px; }
   .panel:has(.stats) h2 { font-size: 17px; margin-bottom: 6px; }
   .panel:has(.stats) .btn-row { margin-top: 10px; }
 }
+
+/* ---------- Field Guide (feature 005, contracts/ui-guide.md) ---------- */
+.panel.guide {
+  width: min(720px, 100%);
+  height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px 20px;
+}
+.guide-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; flex: none; }
+.guide-header h2 { margin: 0; flex: 1; }
+.guide-tabs { display: flex; gap: 6px; width: 100%; }
+.guide-tabs [role=tab] { flex: 1; padding: 8px 10px; border-color: #1e3a5f; color: var(--dim); }
+.guide-tabs [role=tab][aria-selected=true] { border-color: var(--accent); color: var(--accent); background: #10223a; }
+.guide-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-top: 12px;
+  padding-right: 4px;
+}
+body.touch .overlay .guide-list { touch-action: pan-y; }
+.guide-list h3 { margin: 14px 0 8px; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--warn); }
+.guide-list h3:first-child { margin-top: 0; }
+.guide-entry {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 12px;
+  padding: 10px;
+  margin-bottom: 8px;
+  border: 1px solid #13233c;
+  background: #07101d;
+}
+.guide-entry:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+.guide-icon .icon { display: block; }
+.guide-text { min-width: 0; overflow-wrap: anywhere; }
+.guide-name { margin: 0 0 2px; font-size: 16px; color: var(--accent); }
+.guide-text p { margin: 2px 0 0; line-height: 1.4; }
+.guide-tag { color: var(--good); font-size: 13px; }
+.guide-tag.offline { color: var(--bad); font-weight: 600; }
+.guide-concept { color: var(--warn); font-size: 13px; }
+.guide-desc { color: var(--text); font-size: 14px; }
+.guide-stats, .guide-next { font-size: 13px; color: var(--dim); }
+.guide-next { color: var(--good); }
+.guide-entry.locked .guide-name { color: var(--dim); }
+.guide-locked { color: var(--dim); font-style: italic; font-size: 13px; }
+.guide-entry.offline { border-color: var(--bad); }
+.guide * { transition: none; animation: none; }
+body.touch .guide-tabs [role=tab], body.touch #guide-back { min-height: 44px; min-width: 44px; }
+@media (max-width: 600px) {
+  .panel.guide { padding: 12px; }
+  .guide-entry { grid-template-columns: 32px 1fr; gap: 10px; padding: 8px; }
+  .guide-icon .icon { width: 32px; height: 32px; }
+  .guide-name { font-size: 15px; }
+  .guide-desc { font-size: 13px; }
+}
+/* Landscape phones: header on one row so the list keeps most of the height. */
+@media (max-height: 500px) {
+  .panel.guide { padding: 8px 14px; }
+  .guide-header { flex-wrap: nowrap; }
+  .guide-header h2 { font-size: 17px; flex: none; }
+  .guide-tabs { width: auto; flex: 1; }
+  .guide-list { margin-top: 8px; }
+  /* Pause screen with three buttons and the sound controls. */
+  .panel-pause { padding: 12px 16px; }
+  .panel-pause h2 { font-size: 18px; margin-bottom: 4px; }
+  .panel-pause p { margin: 4px 0; }
+  .panel-pause .btn-row { margin-top: 8px; gap: 8px; }
+}

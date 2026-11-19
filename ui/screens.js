@@ -3,46 +3,13 @@
 
 import { formatTime } from './hud.js';
 import { createTapGuard } from './tapguard.js';
+import { describeStatChange } from './stattext.js';
+import { problemIcon, loadoutIcon } from './icons.js';
+
+export { describeStatChange };
 
 // Screens whose touch selections are guarded (003 FR-008, clarification Q5).
-const GUARDED = new Set(['levelup', 'paused']);
-
-const STAT_LABELS = {
-  damage: 'Damage',
-  cooldown: 'Cooldown',
-  projectileSpeed: 'Projectile speed',
-  range: 'Range',
-  pierce: 'Pierce',
-  barriers: 'Barriers',
-  orbitRadius: 'Orbit radius',
-  rotationSpeed: 'Rotation speed',
-  hitCooldown: 'Hit cooldown',
-  radius: 'Radius',
-  projectiles: 'Projectiles',
-  maxUptimeBonus: 'Max Uptime',
-  regenPerSecond: 'Uptime regen',
-  moveSpeedPercent: 'Move speed',
-  pickupRadiusPercent: 'Pickup radius',
-  uptimeRestorePercent: 'Restore Uptime',
-};
-const UNITS = {
-  cooldown: ' s',
-  hitCooldown: ' s',
-  rotationSpeed: ' rad/s',
-  regenPerSecond: '/s',
-  maxUptimeBonus: '',
-  moveSpeedPercent: '%',
-  pickupRadiusPercent: '%',
-  uptimeRestorePercent: '%',
-};
-const PLUS = new Set(['maxUptimeBonus', 'regenPerSecond', 'moveSpeedPercent', 'pickupRadiusPercent', 'uptimeRestorePercent']);
-
-const fmtValue = (stat, v) => `${PLUS.has(stat) ? '+' : ''}${v}${UNITS[stat] ?? ''}`;
-
-export function describeStatChange(c) {
-  const label = STAT_LABELS[c.stat] ?? c.stat;
-  return c.from === null ? `${label} ${fmtValue(c.stat, c.to)}` : `${label} ${fmtValue(c.stat, c.from)} → ${fmtValue(c.stat, c.to)}`;
-}
+const GUARDED = new Set(['levelup', 'paused', 'guide']); // 'guide': feature 005
 
 function el(tag, props = {}, ...children) {
   const node = document.createElement(tag);
@@ -207,15 +174,105 @@ export function createScreens({ touchMode = null } = {}) {
   }
 
   // sound: {settings, available, onMute, onMusic(pct), onEffects(pct)} (002 contracts/ui-controls.md).
-  function showPause(onResume, onQuit, sound) {
-    const panel = el('div', { className: 'panel' },
+  // Feature 005: { onGuide, focusGuide } adds the Field Guide button and, when returning from the
+  // guide, focuses it instead of Resume.
+  function showPause(onResume, onQuit, sound, { onGuide = null, focusGuide = false } = {}) {
+    const guideBtn = onGuide ? el('button', { id: 'open-guide', onclick: onGuide }, 'Field Guide') : '';
+    const panel = el('div', { className: 'panel panel-pause' },
       el('h2', {}, 'Paused'),
       el('p', {}, 'Nothing moves while paused. Press Esc or P to resume.'),
       el('div', { className: 'btn-row' },
         el('button', { onclick: onResume }, 'Resume'),
+        guideBtn,
         el('button', { onclick: onQuit }, 'Quit to Title')));
     if (sound) panel.append(soundControls(sound));
-    open('paused', panel, 'Paused');
+    open('paused', panel, focusGuide ? null : 'Paused');
+    if (focusGuide && guideBtn) guideBtn.focus();
+  }
+
+  // ---- Field Guide (feature 005, contracts/ui-guide.md) ----
+  const ENTRY_TEXT = { locked: '???', notMet: 'Not yet encountered' };
+  let entrySeq = 0;
+
+  function entry(icon, name, lines) {
+    const id = `guide-entry-${++entrySeq}`;
+    const art = el('article', { className: 'guide-entry', tabindex: '0', 'aria-labelledby': id });
+    const iconBox = el('div', { className: 'guide-icon' });
+    iconBox.innerHTML = icon; // SVG markup from ui/icons.js (built only from validated data)
+    const text = el('div', { className: 'guide-text' }, el('h4', { id, className: 'guide-name' }, name),
+      ...lines.filter(Boolean).map(([cls, t]) => el('p', { className: cls }, t)));
+    art.append(iconBox, text);
+    return art;
+  }
+
+  function problemNode(p) {
+    const tag = p.kind === 'incident' ? ['guide-tag', `Major Incident · arrives at difficulty ${p.arrivalLevel}`] : null;
+    if (p.locked) {
+      const node = entry(problemIcon(p), ENTRY_TEXT.locked, [tag, ['guide-locked', ENTRY_TEXT.notMet]]);
+      node.classList.add('locked');
+      return node;
+    }
+    return entry(problemIcon(p), p.name, [tag, ['guide-concept', p.concept], ['guide-desc', p.description]]);
+  }
+
+  function loadoutNode(item, def) {
+    const status = item.owned ? `Rank ${item.rank} / 5${item.offline ? ' · OFFLINE' : ''}` : 'Not owned';
+    const node = entry(loadoutIcon(def), item.name, [
+      ['guide-tag' + (item.offline ? ' offline' : ''), status],
+      ['guide-concept', item.concept],
+      ['guide-desc', item.description],
+      ['guide-stats', item.stats.map(describeStatChange).join(' · ')],
+      item.next && item.next.length ? ['guide-next', `Next rank: ${item.next.map(describeStatChange).join(' · ')}`] : null,
+    ]);
+    if (item.offline) node.classList.add('offline');
+    return node;
+  }
+
+  // model: ui/guide.js › buildGuide(run); defs: run.defs (for loadout icons by tool kind).
+  function showGuide(model, defs, { onBack }) {
+    entrySeq = 0;
+    const list = el('div', { id: 'guide-list', className: 'guide-list', role: 'tabpanel', tabindex: '0' });
+    const tabs = [
+      { id: 'tab-problems', label: 'Network problems', render: () => [
+        el('h3', {}, 'Network problems'), ...model.problems.map(problemNode),
+        el('h3', {}, 'Major Incidents'), ...model.incidents.map(problemNode)] },
+      { id: 'tab-loadout', label: 'Tools & passives', render: () => {
+        const node = (item) => loadoutNode(item, (item.kind === 'tool' ? defs.tool : defs.passive).get(item.id));
+        return [el('h3', {}, 'Tools'), ...model.loadout.filter((x) => x.kind === 'tool').map(node),
+          el('h3', {}, 'Passives'), ...model.loadout.filter((x) => x.kind === 'passive').map(node)];
+      } },
+    ];
+    const buttons = tabs.map((t) => el('button', { id: t.id, role: 'tab', type: 'button', 'aria-controls': 'guide-list' }, t.label));
+    function select(i, focus = false) {
+      buttons.forEach((b, j) => {
+        b.setAttribute('aria-selected', String(i === j));
+        b.tabIndex = i === j ? 0 : -1;
+      });
+      list.setAttribute('aria-labelledby', tabs[i].id);
+      list.replaceChildren(...tabs[i].render());
+      list.scrollTop = 0;
+      if (focus) buttons[i].focus();
+    }
+    buttons.forEach((b, i) => {
+      b.addEventListener('click', () => select(i, true));
+      b.addEventListener('keydown', (ev) => {
+        const n = buttons.length;
+        const to = { ArrowRight: (i + 1) % n, ArrowLeft: (i + n - 1) % n, Home: 0, End: n - 1 }[ev.key];
+        if (to === undefined) return;
+        ev.preventDefault();
+        select(to, true);
+      });
+    });
+    const back = el('button', { id: 'guide-back', type: 'button', onclick: onBack }, 'Back');
+    const panel = el('div', { className: 'panel guide' },
+      el('div', { className: 'guide-header' },
+        back,
+        el('h2', {}, 'Field Guide'),
+        el('div', { role: 'tablist', 'aria-label': 'Field Guide sections', className: 'guide-tabs' }, ...buttons)),
+      list);
+    select(0);
+    open('guide', panel, 'Field Guide');
+    buttons[0].focus();
   }
 
   function soundControls(sound) {
@@ -313,6 +370,6 @@ export function createScreens({ touchMode = null } = {}) {
 
   return {
     get current() { return current; },
-    close, announce, showLoading, showError, showTitle, showLevelUp, showPause, showEnd, showBanner, clearBanners,
+    close, announce, showLoading, showError, showTitle, showLevelUp, showPause, showGuide, showEnd, showBanner, clearBanners,
   };
 }

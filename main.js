@@ -8,6 +8,7 @@ import { createTouchMode } from './ui/touchmode.js';
 import { createHud } from './ui/hud.js';
 import { createRenderer } from './ui/render.js';
 import { createInput } from './ui/input.js';
+import { buildGuide } from './ui/guide.js';
 import { validateAudioData } from './audio/content.js';
 import { createDirector } from './audio/director.js';
 import { createAudio } from './audio/synth.js';
@@ -95,12 +96,28 @@ function quitToTitle() {
   screens.showTitle(() => startRun(params.seed ?? freshSeed()));
 }
 
+// Field Guide (feature 005): opened only from the pause screen; the run stays paused throughout.
+function showPauseScreen(focusGuide = false) {
+  screens.showPause(togglePause, quitToTitle, pauseSound, { onGuide: openGuide, focusGuide });
+}
+
+function openGuide() {
+  const run = state.run;
+  if (!run || run.phase !== 'paused') return;
+  screens.showGuide(buildGuide(run), run.defs, { onBack: closeGuide });
+}
+
+function closeGuide() {
+  if (state.run && state.run.phase === 'paused') showPauseScreen(true);
+}
+
 function togglePause() {
   const run = state.run;
   if (!run) return;
+  if (screens.current === 'guide') return closeGuide(); // Esc / P go back to the pause screen, never resume
   if (run.phase === 'playing') {
     pause(run);
-    screens.showPause(togglePause, quitToTitle, pauseSound);
+    showPauseScreen();
   } else if (run.phase === 'paused') {
     resume(run);
     screens.close();

@@ -24,6 +24,7 @@ Each button is at least 44 × 44 CSS px (FR-006, FR-010) and has an accessible n
 | Level-up | Choices guarded (below). Number keys unchanged. |
 | Paused | Buttons and sliders guarded (below); sliders usable by touch (feature 002 FR-013). |
 | End | New Run / Replay Seed by tap (no guard needed). |
+| Field Guide (feature 005) | Back and the section tabs guarded like the pause screen; the entry list scrolls by touch and its entries are not selectable. |
 
 ## Tap guard (FR-008, clarification Q5)
 

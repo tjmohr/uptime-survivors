@@ -21,6 +21,7 @@ export function hashRun(run) {
     run.projectiles.map((p) => `${p.x}:${p.y}:${p.pierceLeft}`).join('|'),
     run.pickups.map((p) => `${p.x}:${p.y}:${p.value}${p.reward ? ':r' : ''}`).join('|'),
     (run.incidents ?? []).map((r) => `${r.id}:${r.state}`).join('|'),
+    (run.encountered ?? []).join('|'),
     run.offer ? run.offer.map((o) => `${o.kind}:${o.id}:${o.toRank}`).join('|') : '',
     run.stats.enemiesDefeated,
   ];

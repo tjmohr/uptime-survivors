@@ -1,0 +1,207 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>smoke-guide</title></head>
+<body>
+<iframe id="f" width="1280" height="800"></iframe>
+<script type="module">
+// Scripted Field Guide checks GB1–GB4 (specs/005-field-guide/quickstart.md), run by drive.py.
+import { hashRun } from '/engine/hash.js';
+import { buildGuide } from '/ui/guide.js';
+import { describeStatChange } from '/ui/stattext.js';
+import { shapePoints } from '/ui/icons.js';
+
+const mode = new URLSearchParams(location.search).get('mode');
+const results = { mode };
+const frame = document.getElementById('f');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const W = () => frame.contentWindow;
+const G = () => W().__uptimeSurvivors;
+const R = () => G().run;
+const doc = () => frame.contentDocument;
+const $ = (sel) => doc().querySelector(sel);
+const $$ = (sel) => [...doc().querySelectorAll(sel)];
+const key = (code, k = code) => {
+  const target = doc().activeElement || doc().body;
+  target.dispatchEvent(new (W().KeyboardEvent)('keydown', { code, key: k, bubbles: true, cancelable: true }));
+  target.dispatchEvent(new (W().KeyboardEvent)('keyup', { code, key: k, bubbles: true }));
+};
+async function until(fn, ms = 20000, label = '') {
+  const t0 = performance.now();
+  while (performance.now() - t0 < ms) { try { if (fn()) return true; } catch {} await sleep(15); }
+  throw new Error('timeout: ' + label);
+}
+async function start(url) {
+  const loaded = new Promise((r) => frame.addEventListener('load', r, { once: true }));
+  frame.src = url;
+  await loaded;
+  await until(() => doc()?.querySelector('#overlay button') && G(), 10000, 'title');
+  doc().querySelector('#overlay button').click();
+  await until(() => R()?.phase === 'playing', 3000, 'start');
+}
+let keeper = null;
+function keepAlive() {
+  clearInterval(keeper);
+  keeper = setInterval(() => {
+    const run = R();
+    if (!run) return;
+    run.engineer.maxUptime = 1e12; run.engineer.uptime = 1e12;
+    if (run.phase === 'levelup') { key('Digit1', '1'); }
+  }, 20);
+}
+async function pauseAndOpen() {
+  clearInterval(keeper);
+  await until(() => R().phase === 'playing', 5000, 'playing before pause');
+  key('Escape');
+  await until(() => R().phase === 'paused' && $('#open-guide'), 3000, 'pause screen');
+  $('#open-guide').click();
+  await until(() => $('#guide-list .guide-entry'), 3000, 'guide open');
+}
+const entries = () => $$('#guide-list .guide-entry');
+const name = (a) => a.querySelector('.guide-name').textContent;
+let pass = true;
+const notes = [];
+const expect = (cond, text) => { notes.push(`${cond ? 'ok' : 'FAIL'} ${text}`); pass &&= !!cond; };
+
+try {
+  if (mode === 'open') {
+    // GB1: pause → Field Guide → Network problems, locked as run.encountered says, icons match data.
+    await start('/index.html?seed=7&levelSeconds=4');
+    keepAlive();
+    await until(() => R().difficultyLevel >= 8, 60000, 'level 8');
+    clearInterval(keeper);
+    key('Escape');
+    await until(() => R().phase === 'paused', 3000, 'paused');
+    const labels = $$('#overlay .btn-row button').map((b) => b.textContent);
+    expect(labels.join('|') === 'Resume|Field Guide|Quit to Title', `pause buttons ${labels.join(' / ')}`);
+    $('#open-guide').click();
+    await until(() => $('#guide-list .guide-entry'), 3000, 'guide open');
+    const run = R();
+    const list = entries();
+    expect(list.length === 8, `${list.length} entries (5 enemies + 3 incidents)`);
+    const tab = $('[role=tab][aria-selected=true]');
+    expect(tab && tab.textContent === 'Network problems', 'opens on Network problems');
+    const model = buildGuide(run);
+    const all = [...model.problems, ...model.incidents];
+    let match = 0;
+    all.forEach((p, i) => {
+      const a = list[i];
+      const met = run.encountered.includes(p.id);
+      const def = p.kind === 'enemy' ? run.data.enemies.find((e) => e.id === p.id) : run.data.incidents.find((e) => e.id === p.id);
+      const okText = met ? name(a) === def.name && a.textContent.includes(def.concept) && a.textContent.includes(def.description)
+        : name(a) === '???' && a.textContent.includes('Not yet encountered') && a.classList.contains('locked');
+      const poly = a.querySelector('svg polygon');
+      const want = shapePoints(def.shape, 14).map(([x, y]) => `${Math.round(x * 100) / 100},${Math.round(y * 100) / 100}`).join(' ');
+      const okIcon = poly && poly.getAttribute('points') === want && (met ? poly.getAttribute('stroke') === def.color : poly.getAttribute('stroke') !== def.color);
+      if (okText && okIcon) match++;
+      else notes.push(`mismatch ${p.id} met=${met}`);
+    });
+    expect(match === all.length, `${match}/${all.length} entries match data / lock state (met: ${run.encountered.join(', ')})`);
+    expect(run.encountered.includes('route-leak') && !run.encountered.includes('ddos-botnet'), 'some met, some locked at level 8');
+    expect(R().phase === 'paused', 'run still paused');
+    results.GB1 = { pass, note: notes.join('; ') };
+  }
+
+  if (mode === 'loadout') {
+    // GB3: tools & passives text equals the model + level-up wording, incl. OFFLINE and Not owned.
+    await start('/index.html?seed=3');
+    const run = R();
+    run.engineer.tools = [
+      { id: 'ping', rank: 3, cooldownLeft: 0 },
+      { id: 'load-balancer', rank: 1, cooldownLeft: 0, offlineUntil: run.elapsed + 1e6 },
+    ];
+    run.engineer.passives = [{ id: 'bandwidth-upgrade', rank: 5 }];
+    await pauseAndOpen();
+    $('#tab-loadout').click();
+    await until(() => $('[role=tab][aria-selected=true]').id === 'tab-loadout', 2000, 'tab switch');
+    const model = buildGuide(R());
+    const list = entries();
+    expect(list.length === 6, `${list.length} loadout entries`);
+    model.loadout.forEach((item, i) => {
+      const a = list[i];
+      const status = item.owned ? `Rank ${item.rank} / 5${item.offline ? ' · OFFLINE' : ''}` : 'Not owned';
+      const stats = item.stats.map(describeStatChange).join(' · ');
+      const next = item.next && item.next.length ? `Next rank: ${item.next.map(describeStatChange).join(' · ')}` : null;
+      const ok = name(a) === item.name && a.querySelector('.guide-tag').textContent === status &&
+        a.querySelector('.guide-stats').textContent === stats &&
+        (next ? a.querySelector('.guide-next')?.textContent === next : !a.querySelector('.guide-next'));
+      expect(ok, `${item.id}: ${status} | ${stats}${next ? ' | ' + next : ''}`);
+    });
+    const lb = list[model.loadout.findIndex((x) => x.id === 'load-balancer')];
+    expect(lb.classList.contains('offline'), 'Load Balancer shown OFFLINE');
+    results.GB3 = { pass, note: notes.join('; ') };
+  }
+
+  if (mode === 'keys') {
+    // GB2: keyboard flow, Esc and P go back to pause with focus on Field Guide; nothing changes.
+    await start('/index.html?seed=5&levelSeconds=4');
+    keepAlive();
+    await until(() => R().difficultyLevel >= 3, 20000, 'level 3');
+    await pauseAndOpen();
+    const before = hashRun(R());
+    const tick = R().tick;
+    expect(doc().activeElement.id === 'tab-problems', 'focus starts on the selected tab');
+    key('ArrowRight', 'ArrowRight');
+    expect($('#tab-loadout').getAttribute('aria-selected') === 'true' && doc().activeElement.id === 'tab-loadout', 'Right arrow → Tools & passives');
+    key('Home', 'Home');
+    expect($('#tab-problems').getAttribute('aria-selected') === 'true', 'Home → Network problems');
+    key('End', 'End');
+    expect($('#tab-loadout').getAttribute('aria-selected') === 'true', 'End → Tools & passives');
+    key('ArrowLeft', 'ArrowLeft');
+    expect($('#tab-problems').getAttribute('aria-selected') === 'true', 'Left arrow → Network problems');
+    // Tab order: the focusable elements after the selected tab are the list and then every entry.
+    const focusables = $$('#overlay button, #overlay [tabindex]').filter((e) => e.tabIndex >= 0);
+    const entryCount = entries().length;
+    const reachable = focusables.filter((e) => e.classList.contains('guide-entry')).length;
+    expect(reachable === entryCount && entryCount === 8, `Tab reaches all ${reachable}/${entryCount} entries`);
+    // SC-001: Field Guide (1), Right arrow to the section (2), Tab to the last entry (3) — nothing else between.
+    const tabIdx = focusables.findIndex((e) => e.getAttribute('aria-selected') === 'true');
+    const between = focusables.slice(tabIdx + 1).filter((e) => !e.classList.contains('guide-entry') && e.id !== 'guide-list');
+    expect(between.length === 0, `SC-001: only the list and entries follow the tabs (${between.map((e) => e.id).join(',') || 'none'})`);
+    await sleep(3000);
+    expect(R().phase === 'paused' && R().tick === tick && hashRun(R()) === before, 'run unchanged after 3 s open');
+    key('Escape');
+    await until(() => $('#open-guide'), 2000, 'back to pause (Esc)');
+    expect(R().phase === 'paused' && doc().activeElement.id === 'open-guide', 'Esc → pause screen, focus on Field Guide');
+    $('#open-guide').click();
+    await until(() => $('#guide-list .guide-entry'), 2000, 'reopen');
+    key('KeyP', 'p');
+    await until(() => $('#open-guide'), 2000, 'back to pause (P)');
+    expect(R().phase === 'paused' && doc().activeElement.id === 'open-guide', 'P → pause screen, focus on Field Guide');
+    $('#open-guide').click();
+    await until(() => $('#guide-back'), 2000, 'reopen');
+    $('#guide-back').click();
+    await until(() => $('#open-guide'), 2000, 'back button');
+    expect(R().phase === 'paused' && doc().activeElement.id === 'open-guide', 'Back → pause screen, focus on Field Guide');
+    expect(hashRun(R()) === before, 'hash identical after opening and closing three times');
+    key('Escape');
+    await until(() => R().phase === 'playing', 2000, 'resume from pause');
+    expect(true, 'Esc on the pause screen still resumes');
+    results.GB2 = { pass, note: notes.join('; ') };
+  }
+
+  if (mode === 'aria') {
+    // GB4: roles, labels, decorative icons, no locked text in the DOM.
+    await start('/index.html?seed=9');
+    await pauseAndOpen();
+    const tablist = $('[role=tablist]');
+    const tabs = $$('[role=tab]');
+    const panel = $('[role=tabpanel]');
+    expect(tablist && tabs.length === 2 && panel, 'tablist, 2 tabs, tabpanel');
+    expect(tabs.every((t) => t.getAttribute('aria-controls') === 'guide-list') && panel.getAttribute('aria-labelledby') === 'tab-problems', 'aria-controls / aria-labelledby');
+    expect(tabs.filter((t) => t.getAttribute('aria-selected') === 'true').length === 1, 'exactly one selected tab');
+    const list = entries();
+    expect(list.every((a) => doc().getElementById(a.getAttribute('aria-labelledby'))?.classList.contains('guide-name')), 'entries labelled by their name');
+    expect($$('#guide-list svg').every((s) => s.getAttribute('aria-hidden') === 'true'), 'icons aria-hidden');
+    const run = R();
+    const lockedDefs = [...run.data.enemies, ...run.data.incidents].filter((d) => !run.encountered.includes(d.id));
+    const html = $('#overlay').innerHTML; // the guide itself (the level-1 "New threat" banner is outside it)
+    const leaked = lockedDefs.filter((d) => html.includes(d.name) || html.includes(d.description));
+    expect(lockedDefs.length >= 6 && leaked.length === 0, `${lockedDefs.length} locked, no locked names in the DOM (${leaked.map((d) => d.id).join(',') || 'none'})`);
+    results.GB4 = { pass, note: notes.join('; ') };
+  }
+} catch (err) {
+  results.error = String(err && err.stack || err) + ' | so far: ' + notes.join('; ');
+}
+clearInterval(keeper);
+fetch('/__result?d=' + encodeURIComponent(JSON.stringify(results))).catch(() => {});
+</script>
+</body></html>
