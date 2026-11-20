@@ -23,8 +23,8 @@ game:
   skill_level: "beginner"
   play_minutes: 20
   levels: 20
-  card_image: ""
-  card_image_alt: ""
+  card_image: "assets/images/arcade-card.png"
+  card_image_alt: "Gameplay at difficulty 8: the engineer beside the orange Route Leak incident, a red Null Route black hole, a red MAJOR INCIDENT alert under a New threat banner, and the HUD with Uptime, level, and tools."
   repo: "https://github.com/tjmohr/uptime-survivors"
   repo_path: ""
   license: "LicenseRef-All-Rights-Reserved"
@@ -40,8 +40,8 @@ creator:                     # (HUMAN) ask the human for every field here
   consent_to_publish: true
 
 build:                       # the BUILD environment — what made the game
-  started: "unknown"
-  finished: "2026-11-19T16:44:11-07:00"
+  started: "2026-11-18"
+  finished: "2026-11-19"
   wall_time: "unknown"
   spec_driven:
     framework: "GitHub Spec Kit"
@@ -102,14 +102,11 @@ networking and anyone who likes short arcade runs; it plays with a keyboard or b
 
 ## How it was built
 
-The project used GitHub Spec Kit with a ratified constitution (C1 fun and networking theme, C5
-deterministic and self-contained, C6 content as validated data, C7 done is demonstrated) and six
-feature specs. The first playable (001) predates this agent's record, so how it was built and which
+The project used GitHub Spec Kit. The first playable (001) predates this agent's record, so how it was built and which
 model built it are unknown. Features 002–006 (procedural audio, mobile and touch, Major Incidents,
 Field Guide, late-game upgrades) each went through specify, clarify, plan, tasks and analyze; the top
 analysis findings were fixed before an implementation loop (the ralph-loop plugin, three iterations at
-most). The human changed
-direction several times: widening the platform to phones (a constitution amendment), asking for
+most). The human changed direction several times: widening the platform to phones (a constitution amendment), asking for
 Major Incidents to be made easier, and, after balance simulations showed passive-heavy builds dying
 early, choosing a tool floor at difficulty 5/10/15 and stronger early passives. Things that broke and
 were fixed: a stat formatter that misread an index passed by `.map()`, an incident alert that
