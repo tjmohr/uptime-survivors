@@ -21,6 +21,16 @@ export function createTouchMode() {
   addEventListener('contextmenu', (ev) => { if (on) ev.preventDefault(); });
   addEventListener('gesturestart', (ev) => { if (on) ev.preventDefault(); });
   addEventListener('dblclick', (ev) => { if (on) ev.preventDefault(); });
+  // Firefox for Android starts a text selection on long-press (and shows its "Search with
+  // Firefox / Find in page" bar) even with user-select: none, so refuse selections outright,
+  // except inside text inputs.
+  const editable = (t) => t instanceof Element && t.closest('input, textarea, [contenteditable]');
+  addEventListener('selectstart', (ev) => { if (on && !editable(ev.target)) ev.preventDefault(); });
+  document.addEventListener('selectionchange', () => {
+    if (!on) return;
+    const sel = getSelection();
+    if (sel && !sel.isCollapsed && !editable(sel.anchorNode?.parentElement)) sel.removeAllRanges();
+  });
 
   return {
     get on() { return on; },

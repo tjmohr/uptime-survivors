@@ -52,6 +52,9 @@ export function createInput({
       touch.dx = r.dx;
       touch.dy = r.dy;
     });
+    // Cancelling touchstart stops the browser's own long-press handling on the play field (text
+    // selection bar, callouts, magnifier); steering uses pointer events, which still fire.
+    canvas.addEventListener('touchstart', (ev) => { if (ev.cancelable) ev.preventDefault(); }, { passive: false });
     for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
       canvas.addEventListener(type, (ev) => { if (ev.pointerId === touch.pointerId) endSteering(); });
     }

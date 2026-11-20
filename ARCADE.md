@@ -34,7 +34,7 @@ creator:                     # (HUMAN) ask the human for every field here
   github: "tjmohr"
   location: "United States"
   organization: ""
-  links: []
+  links: [https://www.linkedin.com/in/tjmohr1]
   first_spec_project: true
   workshop: "NAF AC6"
   consent_to_publish: true

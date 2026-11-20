@@ -63,11 +63,16 @@ html, body {
 .bar-telemetry { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 .loadout { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .loadout li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 1px solid var(--line);
   background: rgba(8, 14, 26, 0.7);
   padding: 2px 8px;
   font-size: 12px;
 }
+.loadout-icon { display: inline-flex; }
+.loadout-icon .icon { display: block; }
 
 /* ---------- Banner ---------- */
 .notices {
@@ -266,9 +271,11 @@ body.touch .sound-controls input[type=range] { min-height: 44px; }
   .meter-label { font-size: 11px; min-width: 40px; }
   .meter { min-width: 0; flex: 1 1 120px; }
   .meter-value { min-width: 36px; }
-  .hud-top { align-items: flex-start; }
+  /* Uptime meter gets its own full-width line; difficulty and time share the next one. */
+  .hud-top { align-items: flex-start; flex-wrap: wrap; row-gap: 4px; }
+  .hud-top > .meter { flex: 1 1 100%; }
+  .hud-center { text-align: left; }
   .hud-center, .hud-right { flex: 0 0 auto; }
-  .loadout { font-size: 11px; max-height: 3.6em; overflow: hidden; }
   .hud-test { max-width: 40vw; }
   .panel { padding: 16px; }
   .panel h1 { font-size: 24px; }
@@ -324,7 +331,16 @@ body.touch .sound-controls input[type=range] { min-height: 44px; }
 .incident-name { color: var(--bad); font-weight: 600; white-space: nowrap; font-size: 13px; }
 .incident-bar { flex: 1; height: 8px; border-color: var(--bad); }
 .hud-link-warning { color: var(--warn); font-size: 13px; margin-bottom: 4px; }
-.loadout li.offline { color: var(--bad); opacity: 0.75; }
+.loadout li.offline { color: var(--bad); border-color: var(--bad); opacity: 0.75; }
+
+/* Compact loadout on phones (portrait or landscape): icon + rank digit, so every chip fits on
+   screen instead of being clipped. Names stay in each chip's aria-label and in the Field Guide. */
+@media (max-width: 600px), (max-height: 500px) {
+  .loadout { gap: 4px; }
+  .loadout li { padding: 1px 5px; font-size: 11px; gap: 3px; }
+  .loadout-name, .loadout-rank, .loadout-offline { display: none; }
+  .loadout li::after { content: attr(data-rank); font-variant-numeric: tabular-nums; }
+}
 @media (max-width: 600px) {
   .incident-name { font-size: 11px; }
 }

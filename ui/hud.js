@@ -1,6 +1,7 @@
 // HUD values from run state (FR-028).
 
 import { levelEnd } from '../engine/difficulty.js';
+import { loadoutIcon, repeatableIcon } from './icons.js';
 
 export function formatTime(seconds) {
   const s = Math.floor(seconds);
@@ -51,8 +52,8 @@ export function createHud(testLabel) {
     if (key !== loadoutKey) {
       loadoutKey = key;
       els.loadout.replaceChildren(
-        ...e.tools.map((t) => item(run.defs.tool.get(t.id).name, t.rank, offline(t))),
-        ...e.passives.map((p) => item(run.defs.passive.get(p.id).name, p.rank)),
+        ...e.tools.map((t) => item(run.defs.tool.get(t.id), t.rank, offline(t))),
+        ...e.passives.map((p) => item(run.defs.passive.get(p.id), p.rank)),
         ...(e.capacityTakes > 0 ? [repeatableItem(run.data.repeatable.name, e.capacityTakes)] : []),
       );
     }
@@ -101,18 +102,35 @@ export function createHud(testLabel) {
   }
 
   // Capacity Planning (feature 006): times taken instead of rank pips.
-  function repeatableItem(name, n) {
+  // Each chip: icon, name, rank. On phones CSS hides the name and shows the rank as a digit
+  // (data-rank), so the whole loadout fits; the aria-label always carries the full text.
+  function chip(iconSvg, label, parts, rank) {
     const li = document.createElement('li');
-    li.textContent = `${name} ×${n}`;
-    li.setAttribute('aria-label', `${name}, taken ${n} times`);
+    li.setAttribute('aria-label', label);
+    li.dataset.rank = rank;
+    const icon = document.createElement('span');
+    icon.className = 'loadout-icon';
+    icon.innerHTML = iconSvg;
+    li.append(icon, ...parts.map(([cls, text]) => {
+      const span = document.createElement('span');
+      span.className = cls;
+      span.textContent = text;
+      return span;
+    }));
     return li;
   }
 
-  function item(name, rank, offline = false) {
-    const li = document.createElement('li');
-    li.textContent = `${name} ${'▮'.repeat(rank)}${'▯'.repeat(5 - rank)}${offline ? ' OFFLINE' : ''}`;
-    li.setAttribute('aria-label', `${name} rank ${rank} of 5${offline ? ', offline' : ''}`);
-    if (offline) li.className = 'offline';
+  function repeatableItem(name, n) {
+    return chip(repeatableIcon(14), `${name}, taken ${n} times`, [['loadout-name', name], ['loadout-rank', ` ×${n}`]], `×${n}`);
+  }
+
+  function item(def, rank, offline = false) {
+    const li = chip(loadoutIcon(def, 14), `${def.name} rank ${rank} of 5${offline ? ', offline' : ''}`, [
+      ['loadout-name', def.name],
+      ['loadout-rank', ` ${'▮'.repeat(rank)}${'▯'.repeat(5 - rank)}`],
+      ...(offline ? [['loadout-offline', ' OFFLINE']] : []),
+    ], String(rank));
+    if (offline) li.classList.add('offline');
     return li;
   }
 
