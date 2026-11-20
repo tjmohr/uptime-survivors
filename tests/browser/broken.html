@@ -25,11 +25,11 @@
         delete data.tools[0].ranks[0].damage;
         return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
       }
-      // ?audio=1 also breaks data/audio.json (002): a missing effect and a too-short pattern.
+      // ?audio=1 also breaks data/audio.json (002/007): a missing effect and a too-short pattern.
       if (String(url).endsWith('data/audio.json') && location.search.includes('audio=1')) {
         const data = await (await realFetch(url, opts)).json();
         delete data.effects.hit;
-        data.music.layers[0].pattern = 'x...';
+        data.music.songs[0].parts[0].pattern = ['x...']; // feature 007 shape
         return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
       }
       return realFetch(url, opts);

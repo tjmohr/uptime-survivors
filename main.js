@@ -77,7 +77,7 @@ function startRun(seed) {
   state.lastSeed = seed;
   startSound();
   director.reset();
-  audio.startMusic(); // from bar 1 at level 1, for every new run (FR-009)
+  audio.startMusic(seed); // from bar 1 of the seed's first song, for every new run (002 FR-009, 007 FR-014)
   state.run = createRun(state.data, { seed, levelSeconds: params.levelSeconds });
   state.accumulator = 0;
   input.clear();

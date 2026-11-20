@@ -1,8 +1,8 @@
-// Decides what should sound: engine events → effect requests, rate limiting, tempo/layer curve.
+// Decides what should sound: engine events → effect requests and rate limiting.
 // Pure: no browser APIs, timers, or randomness; knows nothing about how sound is made
 // (specs/002-procedural-audio/contracts/audio-api.md, data-model.md › Event → sound mapping).
 
-import { EFFECT_NAMES, LEVELS, voiceDurationMs } from './content.js';
+import { EFFECT_NAMES, voiceDurationMs } from './content.js';
 
 // When more effects want to sound than the concurrency cap allows, earlier names win.
 const PRIORITY = ['levelUp', 'newThreat', 'damage', 'pulse', 'defeat', 'pickup', 'fire', 'hit'];
@@ -18,17 +18,7 @@ const EVENT_TO_EFFECT = {
   'zone-placed': 'pulse', // Null Route (feature 006); Traceroute and the other tools emit 'fire' or 'hit'
 };
 
-// data-model.md › AudioState.bpm: linear from bpmStart (level 1) to bpmEnd (level 20).
-export function bpmForLevel(audioData, level) {
-  const { bpmStart, bpmEnd } = audioData.music;
-  const l = Math.min(LEVELS, Math.max(1, level));
-  return bpmStart + ((bpmEnd - bpmStart) * (l - 1)) / (LEVELS - 1);
-}
-
-// data-model.md › AudioState.activeLayers: layers with joinLevel ≤ level, in data order.
-export function layersForLevel(audioData, level) {
-  return audioData.music.layers.filter((layer) => layer.joinLevel <= level);
-}
+// Feature 007: tempo and music parts now come from audio/arrange.js (bpmForLevel/layersForLevel removed).
 
 export function createDirector(audioData) {
   const durations = {};

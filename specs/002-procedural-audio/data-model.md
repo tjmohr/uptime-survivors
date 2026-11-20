@@ -57,6 +57,10 @@ optionally slides to `toFreq` over `ms`. For `noise` voices `freq` sets the filt
 
 ### Music Definition
 
+> **Superseded by feature 007** ([data-model.md](../007-drum-and-bass-music/data-model.md) › Music, Song, Part):
+> fixed 174 BPM, five songs, 4-level song blocks, build-up stages and a 32-bar phrase cycle replace
+> `bpmStart`/`bpmEnd`/`layers`. The Voice gained optional `unison`, `detuneCents`, `filter.toHz`/`q`, `lfo`, `drive`.
+
 | Field | Type | Rule |
 |-------|------|------|
 | `music.bpmStart` | number | > 0 (plan: 118) |

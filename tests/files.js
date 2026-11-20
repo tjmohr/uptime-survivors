@@ -15,4 +15,5 @@ export const testFiles = [
   './incidents.test.js',
   './guide.test.js',
   './upgrades.test.js',
+  './music.test.js', // feature 007
 ];

@@ -2,6 +2,11 @@
 
 Field meanings and rules: [data-model.md](../data-model.md). This file fixes the JSON shape.
 
+> **Feature 007:** the `music` section below (and `schemaVersion: 1`) is superseded. `audio.json` is now
+> schemaVersion 2 and `music` holds five drum & bass songs — see
+> [007 contracts/music-data.md](../../007-drum-and-bass-music/contracts/music-data.md). `defaults`, `mix` and
+> `effects` are unchanged.
+
 ## Top-level shape
 
 ```json

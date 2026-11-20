@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "defaults": {
     "musicVolume": 60,
     "effectsVolume": 80,
@@ -288,178 +288,1412 @@
     }
   },
   "music": {
-    "bpmStart": 118,
-    "bpmEnd": 156,
+    "bpm": 174,
     "stepsPerBar": 16,
-    "layers": [
+    "levelsPerSong": 4,
+    "crossfadeBars": 2,
+    "cycleBars": 32,
+    "fillBars": [8, 16, 24, 32],
+    "breakdownBars": [29, 30, 31, 32],
+    "ghostGain": 0.35,
+    "songs": [
       {
-        "id": "kick",
-        "joinLevel": 1,
-        "pattern": "x...x...x...x...",
-        "voice": {
-          "wave": "sine",
-          "gain": 0.55,
-          "attackMs": 1,
-          "notes": [
-            {
-              "freq": 150,
-              "toFreq": 45,
-              "ms": 130
+        "id": "liquid-uplink",
+        "name": "Uplink",
+        "style": "liquid",
+        "rootHz": 43.65,
+        "bassAudibility": "headphones",
+        "gain": 1.0,
+        "parts": [
+          {
+            "id": "kick",
+            "role": "drums",
+            "instrument": "kick",
+            "stage": 1,
+            "pattern": ["x.........x.....", "x.........x..x.."],
+            "voice": {
+              "wave": "sine",
+              "gain": 0.5,
+              "attackMs": 1,
+              "notes": [
+                {
+                  "freq": 160,
+                  "ms": 150,
+                  "toFreq": 45
+                }
+              ]
             }
-          ]
-        }
-      },
-      {
-        "id": "bass",
-        "joinLevel": 1,
-        "pattern": "..x...x...x...x.",
-        "pitches": [
-          55,
-          55,
-          65.41,
-          49
-        ],
-        "voice": {
-          "wave": "sawtooth",
-          "gain": 0.2,
-          "attackMs": 2,
-          "filter": {
-            "type": "lowpass",
-            "hz": 420
           },
-          "notes": [
-            {
-              "freq": 55,
-              "ms": 110
+          {
+            "id": "snare",
+            "role": "drums",
+            "instrument": "snare",
+            "stage": 1,
+            "pattern": ["....x.......x...", "....x......ox..."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.26,
+              "attackMs": 1,
+              "filter": {
+                "type": "bandpass",
+                "hz": 2000,
+                "q": 0.9
+              },
+              "notes": [
+                {
+                  "freq": 2000,
+                  "ms": 140
+                }
+              ]
             }
-          ]
-        }
-      },
-      {
-        "id": "closed-hat",
-        "joinLevel": 4,
-        "pattern": "x.x.x.x.x.x.x.x.",
-        "voice": {
-          "wave": "noise",
-          "gain": 0.05,
-          "attackMs": 0,
-          "filter": {
-            "type": "highpass",
-            "hz": 8000
           },
-          "notes": [
-            {
-              "freq": 8000,
-              "ms": 25
+          {
+            "id": "sub",
+            "role": "bass",
+            "register": "sub",
+            "stage": 1,
+            "pattern": ["x.......x.......", "x.......x....x..", "x.......x.......", "x.......x....x..", "x.......x.......", "x.......x....x..", "x.......x.......", "x.......x....x.."],
+            "notes": [0, 0, 0, 0, 0, -4, -4, -4, -4, -4, 3, 3, 3, 3, 3, -2, -2, -2, -2, -2],
+            "voice": {
+              "wave": "sine",
+              "gain": 0.5,
+              "attackMs": 4,
+              "notes": [
+                {
+                  "freq": 43.65,
+                  "ms": 670
+                }
+              ]
             }
-          ]
-        }
-      },
-      {
-        "id": "clap",
-        "joinLevel": 8,
-        "pattern": "....x.......x...",
-        "voice": {
-          "wave": "noise",
-          "gain": 0.14,
-          "attackMs": 1,
-          "filter": {
-            "type": "bandpass",
-            "hz": 1500
           },
-          "notes": [
-            {
-              "freq": 1500,
-              "ms": 80
+          {
+            "id": "fill",
+            "role": "fill",
+            "stage": 1,
+            "pattern": ["........x..x.x.x"],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.2,
+              "attackMs": 1,
+              "filter": {
+                "type": "bandpass",
+                "hz": 1900,
+                "q": 0.9
+              },
+              "notes": [
+                {
+                  "freq": 1900,
+                  "ms": 80
+                }
+              ]
             }
-          ]
-        }
-      },
-      {
-        "id": "open-hat",
-        "joinLevel": 12,
-        "pattern": "..x...x...x...x.",
-        "voice": {
-          "wave": "noise",
-          "gain": 0.045,
-          "attackMs": 0,
-          "filter": {
-            "type": "highpass",
-            "hz": 6000
           },
-          "notes": [
-            {
-              "freq": 6000,
-              "ms": 140
+          {
+            "id": "hat",
+            "role": "drums",
+            "instrument": "hat",
+            "stage": 2,
+            "pattern": ["x.o.x.o.x.o.x.o.", "x.o.x.o.x.o.x.oo"],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.045,
+              "attackMs": 1,
+              "filter": {
+                "type": "highpass",
+                "hz": 8500
+              },
+              "notes": [
+                {
+                  "freq": 8500,
+                  "ms": 35
+                }
+              ]
             }
-          ]
-        }
-      },
-      {
-        "id": "percussion",
-        "joinLevel": 12,
-        "pattern": "...x..x....x..x.",
-        "voice": {
-          "wave": "triangle",
-          "gain": 0.09,
-          "attackMs": 1,
-          "notes": [
-            {
-              "freq": 330,
-              "toFreq": 220,
-              "ms": 50
-            }
-          ]
-        }
-      },
-      {
-        "id": "stab",
-        "joinLevel": 16,
-        "pattern": "x......x...x....",
-        "pitches": [
-          220,
-          261.63,
-          196
-        ],
-        "voice": {
-          "wave": "square",
-          "gain": 0.05,
-          "attackMs": 2,
-          "filter": {
-            "type": "lowpass",
-            "hz": 1200
           },
-          "notes": [
-            {
-              "freq": 220,
-              "ms": 150
+          {
+            "id": "riser",
+            "role": "riser",
+            "stage": 2,
+            "pattern": ["x..............."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.05,
+              "attackMs": 1100,
+              "filter": {
+                "type": "bandpass",
+                "hz": 400,
+                "toHz": 6000,
+                "q": 1.2
+              },
+              "notes": [
+                {
+                  "freq": 400,
+                  "ms": 1349
+                }
+              ]
             }
-          ]
-        }
+          },
+          {
+            "id": "pad",
+            "role": "music",
+            "stage": 3,
+            "pattern": ["x...............", "................", "x...............", "................", "x...............", "................", "x...............", "................"],
+            "notes": [
+              [24, 27, 31, 34],
+              [20, 24, 27, 31],
+              [27, 31, 34, 39],
+              [22, 26, 29, 34]
+            ],
+            "voice": {
+              "wave": "sawtooth",
+              "gain": 0.05,
+              "attackMs": 450,
+              "unison": 2,
+              "detuneCents": 12,
+              "filter": {
+                "type": "lowpass",
+                "hz": 1400,
+                "q": 0.7
+              },
+              "notes": [
+                {
+                  "freq": 174.6,
+                  "ms": 2719
+                }
+              ]
+            }
+          },
+          {
+            "id": "air",
+            "role": "music",
+            "stage": 3,
+            "pattern": ["x...............", "................", "................", "................"],
+            "notes": [36],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.018,
+              "attackMs": 900,
+              "filter": {
+                "type": "highpass",
+                "hz": 6000
+              },
+              "notes": [
+                {
+                  "freq": 6000,
+                  "ms": 2719
+                }
+              ]
+            }
+          },
+          {
+            "id": "keys",
+            "role": "music",
+            "stage": 4,
+            "pattern": ["..x.....x.x.....", "..x.....x...x...", "..x.....x.x.....", "..x.....x...x...", "..x.....x.x.....", "..x.....x...x...", "..x.....x.x.....", "..x.....x...x..."],
+            "notes": [
+              [24, 27, 31],
+              [24, 27, 31],
+              [24, 27, 31],
+              [24, 27, 31],
+              [24, 27, 31],
+              [24, 27, 31],
+              [20, 24, 27],
+              [20, 24, 27],
+              [20, 24, 27],
+              [20, 24, 27],
+              [20, 24, 27],
+              [20, 24, 27],
+              [27, 31, 34],
+              [27, 31, 34],
+              [27, 31, 34],
+              [27, 31, 34],
+              [27, 31, 34],
+              [27, 31, 34],
+              [22, 26, 29],
+              [22, 26, 29],
+              [22, 26, 29],
+              [22, 26, 29],
+              [22, 26, 29],
+              [22, 26, 29]
+            ],
+            "voice": {
+              "wave": "triangle",
+              "gain": 0.07,
+              "attackMs": 4,
+              "filter": {
+                "type": "lowpass",
+                "hz": 2600
+              },
+              "notes": [
+                {
+                  "freq": 174.6,
+                  "ms": 300
+                }
+              ]
+            }
+          },
+          {
+            "id": "ride",
+            "role": "drums",
+            "instrument": "hat",
+            "stage": 4,
+            "pattern": ["..x...x...x...x."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.03,
+              "attackMs": 1,
+              "filter": {
+                "type": "highpass",
+                "hz": 6000
+              },
+              "notes": [
+                {
+                  "freq": 6000,
+                  "ms": 220
+                }
+              ]
+            }
+          },
+          {
+            "id": "alarm",
+            "role": "incident",
+            "pattern": ["x.......x.......", "x...x...x......."],
+            "notes": [24, 23, 24, 23, 19],
+            "voice": {
+              "wave": "triangle",
+              "gain": 0.08,
+              "attackMs": 5,
+              "filter": {
+                "type": "lowpass",
+                "hz": 3000
+              },
+              "notes": [
+                {
+                  "freq": 174.6,
+                  "ms": 260
+                }
+              ]
+            }
+          }
+        ]
       },
       {
-        "id": "incident-alarm",
-        "trigger": "incident",
-        "pattern": "x.......x.......",
-        "pitches": [
-          110,
-          116.54
-        ],
-        "voice": {
-          "wave": "sawtooth",
-          "gain": 0.09,
-          "attackMs": 10,
-          "filter": {
-            "type": "lowpass",
-            "hz": 700
-          },
-          "notes": [
-            {
-              "freq": 110,
-              "ms": 300
+        "id": "jump-up-handshake",
+        "name": "Handshake",
+        "style": "jump-up",
+        "rootHz": 49.0,
+        "bassAudibility": "speakers",
+        "gain": 1.0,
+        "parts": [
+          {
+            "id": "kick",
+            "role": "drums",
+            "instrument": "kick",
+            "stage": 1,
+            "pattern": ["x.........x.....", "x.........x...x."],
+            "voice": {
+              "wave": "sine",
+              "gain": 0.62,
+              "attackMs": 1,
+              "notes": [
+                {
+                  "freq": 160,
+                  "ms": 150,
+                  "toFreq": 45
+                }
+              ]
             }
-          ]
-        }
+          },
+          {
+            "id": "snare",
+            "role": "drums",
+            "instrument": "snare",
+            "stage": 1,
+            "pattern": ["....x.......x..."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.32,
+              "attackMs": 1,
+              "filter": {
+                "type": "bandpass",
+                "hz": 1700,
+                "q": 0.9
+              },
+              "notes": [
+                {
+                  "freq": 1700,
+                  "ms": 130
+                }
+              ]
+            }
+          },
+          {
+            "id": "body",
+            "role": "drums",
+            "instrument": "perc",
+            "stage": 1,
+            "pattern": ["....x.......x..."],
+            "voice": {
+              "wave": "triangle",
+              "gain": 0.18,
+              "attackMs": 1,
+              "notes": [
+                {
+                  "freq": 210,
+                  "ms": 90,
+                  "toFreq": 151.2
+                }
+              ]
+            }
+          },
+          {
+            "id": "sub",
+            "role": "bass",
+            "register": "sub",
+            "stage": 1,
+            "pattern": ["x.....x...x.....", "x.....x...x...x.", "x.....x...x.....", "x.....x...x...x.", "x.....x...x.....", "x.....x...x...x.", "x.....x...x.....", "x.....x...x...x."],
+            "notes": [0, 0, 3, 0, 0, -2, 5, 0, 0, 3, 0, 0, 7, 5, 0, 0, 3, 0, 0, -2, 5, -2, -2, 1, -4, -4, -2, 0],
+            "voice": {
+              "wave": "sine",
+              "gain": 0.45,
+              "attackMs": 4,
+              "notes": [
+                {
+                  "freq": 49.0,
+                  "ms": 300
+                }
+              ]
+            }
+          },
+          {
+            "id": "talker",
+            "role": "bass",
+            "register": "upper",
+            "stage": 1,
+            "pattern": ["x.....x...x.....", "x.....x...x...x.", "x.....x...x.....", "x.....x...x...x.", "x.....x...x.....", "x.....x...x...x.", "x.....x...x.....", "x.....x...x...x."],
+            "notes": [12, 12, 15, 12, 12, 10, 17, 12, 12, 15, 12, 12, 19, 17, 12, 12, 15, 12, 12, 10, 17, 10, 10, 13, 8, 8, 10, 12],
+            "voice": {
+              "wave": "square",
+              "gain": 0.2,
+              "attackMs": 3,
+              "drive": 0.4,
+              "filter": {
+                "type": "lowpass",
+                "hz": 700,
+                "q": 8
+              },
+              "lfo": {
+                "target": "filter",
+                "steps": 3,
+                "depth": 600
+              },
+              "notes": [
+                {
+                  "freq": 98.0,
+                  "ms": 300
+                }
+              ]
+            }
+          },
+          {
+            "id": "fill",
+            "role": "fill",
+            "stage": 1,
+            "pattern": ["........x.x.x.xx"],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.24,
+              "attackMs": 1,
+              "filter": {
+                "type": "bandpass",
+                "hz": 1700
+              },
+              "notes": [
+                {
+                  "freq": 1700,
+                  "ms": 70
+                }
+              ]
+            }
+          },
+          {
+            "id": "hat",
+            "role": "drums",
+            "instrument": "hat",
+            "stage": 2,
+            "pattern": ["..x...x...x...x."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.07,
+              "attackMs": 1,
+              "filter": {
+                "type": "highpass",
+                "hz": 7000
+              },
+              "notes": [
+                {
+                  "freq": 7000,
+                  "ms": 60
+                }
+              ]
+            }
+          },
+          {
+            "id": "shaker",
+            "role": "drums",
+            "instrument": "hat",
+            "stage": 2,
+            "pattern": ["xoxoxoxoxoxoxoxo"],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.035,
+              "attackMs": 1,
+              "filter": {
+                "type": "highpass",
+                "hz": 9000
+              },
+              "notes": [
+                {
+                  "freq": 9000,
+                  "ms": 25
+                }
+              ]
+            }
+          },
+          {
+            "id": "stab",
+            "role": "music",
+            "stage": 3,
+            "pattern": ["..x.......x.....", "................"],
+            "notes": [
+              [19, 22, 26],
+              [17, 20, 24]
+            ],
+            "voice": {
+              "wave": "sawtooth",
+              "gain": 0.06,
+              "attackMs": 3,
+              "unison": 2,
+              "detuneCents": 10,
+              "filter": {
+                "type": "lowpass",
+                "hz": 2200
+              },
+              "notes": [
+                {
+                  "freq": 196.0,
+                  "ms": 160
+                }
+              ]
+            }
+          },
+          {
+            "id": "riser",
+            "role": "riser",
+            "stage": 3,
+            "pattern": ["x..............."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.06,
+              "attackMs": 1100,
+              "filter": {
+                "type": "bandpass",
+                "hz": 400,
+                "toHz": 7000,
+                "q": 1.2
+              },
+              "notes": [
+                {
+                  "freq": 400,
+                  "ms": 1349
+                }
+              ]
+            }
+          },
+          {
+            "id": "horn",
+            "role": "music",
+            "stage": 4,
+            "pattern": ["................", "x.x...x.........", "................", "x.x...x...x.x...", "................", "x.x...x.........", "................", "x...x...x.x.x..."],
+            "notes": [31, 34, 31, 31, 34, 36, 34, 31, 34, 31, 31, 34, 31, 29, 27, 26],
+            "voice": {
+              "wave": "sawtooth",
+              "gain": 0.05,
+              "attackMs": 6,
+              "filter": {
+                "type": "lowpass",
+                "hz": 1800,
+                "toHz": 900,
+                "q": 2
+              },
+              "notes": [
+                {
+                  "freq": 392.0,
+                  "ms": 150
+                }
+              ]
+            }
+          },
+          {
+            "id": "alarm",
+            "role": "incident",
+            "pattern": ["x.......x.......", "x...x...x......."],
+            "notes": [24, 25, 24, 25, 22],
+            "voice": {
+              "wave": "square",
+              "gain": 0.05,
+              "attackMs": 5,
+              "filter": {
+                "type": "lowpass",
+                "hz": 3000
+              },
+              "notes": [
+                {
+                  "freq": 196.0,
+                  "ms": 260
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "neuro-packet-storm",
+        "name": "Packet Storm",
+        "style": "neurofunk",
+        "rootHz": 41.2,
+        "bassAudibility": "speakers",
+        "gain": 1.0,
+        "parts": [
+          {
+            "id": "kick",
+            "role": "drums",
+            "instrument": "kick",
+            "stage": 1,
+            "pattern": ["x.........x.....", "x.......x.x....."],
+            "voice": {
+              "wave": "sine",
+              "gain": 0.6,
+              "attackMs": 1,
+              "notes": [
+                {
+                  "freq": 180,
+                  "ms": 150,
+                  "toFreq": 48
+                }
+              ]
+            }
+          },
+          {
+            "id": "snare",
+            "role": "drums",
+            "instrument": "snare",
+            "stage": 1,
+            "pattern": ["....x.......x..."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.34,
+              "attackMs": 1,
+              "filter": {
+                "type": "bandpass",
+                "hz": 2300,
+                "q": 1
+              },
+              "notes": [
+                {
+                  "freq": 2300,
+                  "ms": 110
+                }
+              ]
+            }
+          },
+          {
+            "id": "body",
+            "role": "drums",
+            "instrument": "perc",
+            "stage": 1,
+            "pattern": ["....x.......x..."],
+            "voice": {
+              "wave": "triangle",
+              "gain": 0.18,
+              "attackMs": 1,
+              "notes": [
+                {
+                  "freq": 230,
+                  "ms": 90,
+                  "toFreq": 165.6
+                }
+              ]
+            }
+          },
+          {
+            "id": "sub",
+            "role": "bass",
+            "register": "sub",
+            "stage": 1,
+            "pattern": ["x.........x.....", "x.......x.x.....", "x.........x.....", "x.....x.x.x.....", "x.........x.....", "x.......x.x.....", "x.........x.....", "x.....x.x.x....."],
+            "notes": [0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, -2, -2, -2, -2],
+            "voice": {
+              "wave": "sine",
+              "gain": 0.45,
+              "attackMs": 4,
+              "notes": [
+                {
+                  "freq": 41.2,
+                  "ms": 330
+                }
+              ]
+            }
+          },
+          {
+            "id": "reese",
+            "role": "bass",
+            "register": "upper",
+            "stage": 1,
+            "pattern": ["x.........x.....", "x.......x.x.....", "x.........x.....", "x.....x.x.x.....", "x.........x.....", "x.......x.x.....", "x.........x.....", "x.....x.x.x....."],
+            "notes": [12, 12, 12, 12, 12, 13, 13, 12, 12, 12, 12, 12, 12, 12, 12, 12, 15, 15, 10, 10, 10, 10],
+            "voice": {
+              "wave": "sawtooth",
+              "gain": 0.16,
+              "attackMs": 4,
+              "unison": 3,
+              "detuneCents": 25,
+              "drive": 0.6,
+              "filter": {
+                "type": "lowpass",
+                "hz": 500,
+                "toHz": 1600,
+                "q": 4
+              },
+              "lfo": {
+                "target": "filter",
+                "steps": 8,
+                "depth": 300
+              },
+              "notes": [
+                {
+                  "freq": 82.4,
+                  "ms": 330
+                }
+              ]
+            }
+          },
+          {
+            "id": "fill",
+            "role": "fill",
+            "stage": 1,
+            "pattern": ["........x.xxx.xx"],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.24,
+              "attackMs": 1,
+              "filter": {
+                "type": "bandpass",
+                "hz": 2300
+              },
+              "notes": [
+                {
+                  "freq": 2300,
+                  "ms": 60
+                }
+              ]
+            }
+          },
+          {
+            "id": "hat",
+            "role": "drums",
+            "instrument": "hat",
+            "stage": 2,
+            "pattern": ["xoxoxoxoxoxoxoxo"],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.05,
+              "attackMs": 1,
+              "filter": {
+                "type": "highpass",
+                "hz": 9000
+              },
+              "notes": [
+                {
+                  "freq": 9000,
+                  "ms": 25
+                }
+              ]
+            }
+          },
+          {
+            "id": "riser",
+            "role": "riser",
+            "stage": 2,
+            "pattern": ["x..............."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.05,
+              "attackMs": 1100,
+              "filter": {
+                "type": "bandpass",
+                "hz": 400,
+                "toHz": 5000,
+                "q": 1.2
+              },
+              "notes": [
+                {
+                  "freq": 400,
+                  "ms": 1349
+                }
+              ]
+            }
+          },
+          {
+            "id": "atmos",
+            "role": "music",
+            "stage": 3,
+            "pattern": ["x...............", "................", "................", "................", "x...............", "................", "................", "................"],
+            "notes": [
+              [12, 13],
+              [15, 16]
+            ],
+            "voice": {
+              "wave": "sawtooth",
+              "gain": 0.035,
+              "attackMs": 600,
+              "filter": {
+                "type": "lowpass",
+                "hz": 700
+              },
+              "notes": [
+                {
+                  "freq": 82.4,
+                  "ms": 2719
+                }
+              ]
+            }
+          },
+          {
+            "id": "metal",
+            "role": "music",
+            "stage": 3,
+            "pattern": ["...x......x...x.", "...x.......x...."],
+            "notes": [36, 37, 36, 34, 39],
+            "voice": {
+              "wave": "square",
+              "gain": 0.05,
+              "attackMs": 1,
+              "filter": {
+                "type": "bandpass",
+                "hz": 2600,
+                "q": 8
+              },
+              "notes": [
+                {
+                  "freq": 329.6,
+                  "ms": 90
+                }
+              ]
+            }
+          },
+          {
+            "id": "yoi",
+            "role": "music",
+            "stage": 4,
+            "pattern": ["......x.......x.", "......x........."],
+            "notes": [24, 27, 22],
+            "voice": {
+              "wave": "sawtooth",
+              "gain": 0.07,
+              "attackMs": 3,
+              "drive": 0.3,
+              "filter": {
+                "type": "bandpass",
+                "hz": 300,
+                "toHz": 2400,
+                "q": 6
+              },
+              "notes": [
+                {
+                  "freq": 164.8,
+                  "ms": 260
+                }
+              ]
+            }
+          },
+          {
+            "id": "alarm",
+            "role": "incident",
+            "pattern": ["x.......x.......", "x...x...x......."],
+            "notes": [24, 25, 24, 25, 27],
+            "voice": {
+              "wave": "triangle",
+              "gain": 0.08,
+              "attackMs": 5,
+              "filter": {
+                "type": "lowpass",
+                "hz": 3000
+              },
+              "notes": [
+                {
+                  "freq": 164.8,
+                  "ms": 260
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "jungle-backbone",
+        "name": "Backbone",
+        "style": "jungle",
+        "rootHz": 55.0,
+        "bassAudibility": "headphones",
+        "gain": 1.0,
+        "parts": [
+          {
+            "id": "kick",
+            "role": "drums",
+            "instrument": "kick",
+            "stage": 1,
+            "pattern": ["x.........x..x..", "x.....x...x.....", "x.........x..x..", "x.x.......x....."],
+            "voice": {
+              "wave": "sine",
+              "gain": 0.55,
+              "attackMs": 1,
+              "notes": [
+                {
+                  "freq": 150,
+                  "ms": 150,
+                  "toFreq": 50
+                }
+              ]
+            }
+          },
+          {
+            "id": "snare",
+            "role": "drums",
+            "instrument": "snare",
+            "stage": 1,
+            "pattern": ["....x..o.o..x..o", "....x..o....x.oo", "....x..o.o..x..o", "....x.o.o.o.x.xo"],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.3,
+              "attackMs": 1,
+              "filter": {
+                "type": "bandpass",
+                "hz": 1900,
+                "q": 0.9
+              },
+              "notes": [
+                {
+                  "freq": 1900,
+                  "ms": 120
+                }
+              ]
+            }
+          },
+          {
+            "id": "hat",
+            "role": "drums",
+            "instrument": "hat",
+            "stage": 1,
+            "pattern": ["xoxoxoxxxoxoxoxo", "xoxoxoxoxoxxxoxo"],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.05,
+              "attackMs": 1,
+              "filter": {
+                "type": "highpass",
+                "hz": 7500
+              },
+              "notes": [
+                {
+                  "freq": 7500,
+                  "ms": 30
+                }
+              ]
+            }
+          },
+          {
+            "id": "sub",
+            "role": "bass",
+            "register": "sub",
+            "stage": 1,
+            "pattern": ["x...............", "........x.......", "x...............", "x.......x.......", "x...............", "........x.......", "x...............", "x.......x......."],
+            "notes": [0, -2, 3, 0, 0, 0, -2, 5, 3, 3],
+            "voice": {
+              "wave": "sine",
+              "gain": 0.5,
+              "attackMs": 4,
+              "notes": [
+                {
+                  "freq": 55.0,
+                  "ms": 1319,
+                  "toFreq": 51.7
+                }
+              ]
+            }
+          },
+          {
+            "id": "fill",
+            "role": "fill",
+            "stage": 1,
+            "pattern": ["........x.x.x.xx"],
+            "voice": {
+              "wave": "triangle",
+              "gain": 0.2,
+              "attackMs": 1,
+              "notes": [
+                {
+                  "freq": 220.0,
+                  "ms": 120,
+                  "toFreq": 165.0
+                }
+              ]
+            },
+            "notes": [24, 24, 19, 19, 15]
+          },
+          {
+            "id": "skank",
+            "role": "music",
+            "stage": 2,
+            "pattern": ["..x...x...x...x."],
+            "notes": [
+              [12, 15, 19],
+              [12, 15, 19],
+              [12, 15, 19],
+              [12, 15, 19]
+            ],
+            "voice": {
+              "wave": "square",
+              "gain": 0.045,
+              "attackMs": 2,
+              "filter": {
+                "type": "bandpass",
+                "hz": 1200,
+                "q": 2
+              },
+              "notes": [
+                {
+                  "freq": 110.0,
+                  "ms": 110
+                }
+              ]
+            }
+          },
+          {
+            "id": "ride",
+            "role": "drums",
+            "instrument": "hat",
+            "stage": 3,
+            "pattern": ["......x.......x."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.05,
+              "attackMs": 1,
+              "filter": {
+                "type": "highpass",
+                "hz": 5000
+              },
+              "notes": [
+                {
+                  "freq": 5000,
+                  "ms": 220
+                }
+              ]
+            }
+          },
+          {
+            "id": "siren",
+            "role": "music",
+            "stage": 3,
+            "pattern": ["x...............", "................", "................", "................", "................", "................", "................", "................"],
+            "notes": [31],
+            "voice": {
+              "wave": "sine",
+              "gain": 0.04,
+              "attackMs": 300,
+              "notes": [
+                {
+                  "freq": 440.0,
+                  "ms": 2719,
+                  "toFreq": 550.0
+                }
+              ]
+            }
+          },
+          {
+            "id": "riser",
+            "role": "riser",
+            "stage": 3,
+            "pattern": ["x..............."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.05,
+              "attackMs": 1100,
+              "filter": {
+                "type": "bandpass",
+                "hz": 400,
+                "toHz": 7000,
+                "q": 1.2
+              },
+              "notes": [
+                {
+                  "freq": 400,
+                  "ms": 1349
+                }
+              ]
+            }
+          },
+          {
+            "id": "hoover",
+            "role": "music",
+            "stage": 4,
+            "pattern": ["x.....x.........", "................", "x.....x...x.....", "................"],
+            "notes": [
+              [12, 15, 19],
+              [10, 14, 17],
+              [12, 15, 19],
+              [8, 12, 15],
+              [10, 14, 17]
+            ],
+            "voice": {
+              "wave": "sawtooth",
+              "gain": 0.05,
+              "attackMs": 4,
+              "unison": 3,
+              "detuneCents": 30,
+              "filter": {
+                "type": "lowpass",
+                "hz": 1600
+              },
+              "notes": [
+                {
+                  "freq": 110.0,
+                  "ms": 240
+                }
+              ]
+            }
+          },
+          {
+            "id": "alarm",
+            "role": "incident",
+            "pattern": ["x.......x.......", "x...x...x......."],
+            "notes": [24, 22, 24, 22, 19],
+            "voice": {
+              "wave": "triangle",
+              "gain": 0.08,
+              "attackMs": 5,
+              "filter": {
+                "type": "lowpass",
+                "hz": 3000
+              },
+              "notes": [
+                {
+                  "freq": 220.0,
+                  "ms": 260
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "dancefloor-uptime",
+        "name": "Uptime",
+        "style": "dancefloor",
+        "rootHz": 36.71,
+        "bassAudibility": "speakers",
+        "gain": 1.0,
+        "parts": [
+          {
+            "id": "kick",
+            "role": "drums",
+            "instrument": "kick",
+            "stage": 1,
+            "pattern": ["x.........x.....", "x.........x...x."],
+            "voice": {
+              "wave": "sine",
+              "gain": 0.62,
+              "attackMs": 1,
+              "notes": [
+                {
+                  "freq": 170,
+                  "ms": 150,
+                  "toFreq": 42
+                }
+              ]
+            }
+          },
+          {
+            "id": "clap",
+            "role": "drums",
+            "instrument": "clap",
+            "stage": 1,
+            "pattern": ["....x.......x..."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.3,
+              "attackMs": 1,
+              "filter": {
+                "type": "bandpass",
+                "hz": 1400,
+                "q": 0.7
+              },
+              "notes": [
+                {
+                  "freq": 1400,
+                  "ms": 150
+                }
+              ]
+            }
+          },
+          {
+            "id": "snare",
+            "role": "drums",
+            "instrument": "snare",
+            "stage": 1,
+            "pattern": ["....x.......x..."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.14,
+              "attackMs": 1,
+              "filter": {
+                "type": "bandpass",
+                "hz": 2600,
+                "q": 1.2
+              },
+              "notes": [
+                {
+                  "freq": 2600,
+                  "ms": 90
+                }
+              ]
+            }
+          },
+          {
+            "id": "sub",
+            "role": "bass",
+            "register": "sub",
+            "stage": 1,
+            "pattern": ["x.....x...x.....", "x.....x...x.x...", "x.....x...x.....", "x.....x...x.x...", "x.....x...x.....", "x.....x...x.x...", "x.....x...x.....", "x.....x...x.x..."],
+            "notes": [0, 0, 3, 0, 0, 5, 3, 0, 0, 3, 0, 0, 7, 5, -2, -2, 1, -2, -2, 3, 1, -4, -4, -1, -4, -4, 0, 3],
+            "voice": {
+              "wave": "sine",
+              "gain": 0.45,
+              "attackMs": 4,
+              "notes": [
+                {
+                  "freq": 36.71,
+                  "ms": 320
+                }
+              ]
+            }
+          },
+          {
+            "id": "growl",
+            "role": "bass",
+            "register": "upper",
+            "stage": 1,
+            "pattern": ["x.....x...x.....", "x.....x...x.x...", "x.....x...x.....", "x.....x...x.x...", "x.....x...x.....", "x.....x...x.x...", "x.....x...x.....", "x.....x...x.x..."],
+            "notes": [12, 12, 15, 12, 12, 17, 15, 12, 12, 15, 12, 12, 19, 17, 10, 10, 13, 10, 10, 15, 13, 8, 8, 11, 8, 8, 12, 15],
+            "voice": {
+              "wave": "sawtooth",
+              "gain": 0.17,
+              "attackMs": 3,
+              "drive": 0.5,
+              "filter": {
+                "type": "lowpass",
+                "hz": 1200,
+                "q": 3
+              },
+              "notes": [
+                {
+                  "freq": 73.42,
+                  "ms": 320
+                }
+              ]
+            }
+          },
+          {
+            "id": "fill",
+            "role": "fill",
+            "stage": 1,
+            "pattern": ["........x.x.xxxx"],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.24,
+              "attackMs": 1,
+              "filter": {
+                "type": "bandpass",
+                "hz": 1500
+              },
+              "notes": [
+                {
+                  "freq": 1500,
+                  "ms": 70
+                }
+              ]
+            }
+          },
+          {
+            "id": "riser",
+            "role": "riser",
+            "stage": 1,
+            "pattern": ["x..............."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.06,
+              "attackMs": 1100,
+              "filter": {
+                "type": "bandpass",
+                "hz": 400,
+                "toHz": 7000,
+                "q": 1.2
+              },
+              "notes": [
+                {
+                  "freq": 400,
+                  "ms": 1349
+                }
+              ]
+            }
+          },
+          {
+            "id": "hat",
+            "role": "drums",
+            "instrument": "hat",
+            "stage": 2,
+            "pattern": ["..x...x...x...x."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.07,
+              "attackMs": 1,
+              "filter": {
+                "type": "highpass",
+                "hz": 7000
+              },
+              "notes": [
+                {
+                  "freq": 7000,
+                  "ms": 50
+                }
+              ]
+            }
+          },
+          {
+            "id": "hat16",
+            "role": "drums",
+            "instrument": "hat",
+            "stage": 2,
+            "pattern": ["x.x.x.x.x.x.x.x."],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.03,
+              "attackMs": 1,
+              "filter": {
+                "type": "highpass",
+                "hz": 9500
+              },
+              "notes": [
+                {
+                  "freq": 9500,
+                  "ms": 25
+                }
+              ]
+            }
+          },
+          {
+            "id": "stabs",
+            "role": "music",
+            "stage": 3,
+            "pattern": ["x.....x.........", "................"],
+            "notes": [
+              [24, 27, 31],
+              [22, 26, 29]
+            ],
+            "voice": {
+              "wave": "sawtooth",
+              "gain": 0.06,
+              "attackMs": 3,
+              "unison": 3,
+              "detuneCents": 14,
+              "filter": {
+                "type": "lowpass",
+                "hz": 3000
+              },
+              "notes": [
+                {
+                  "freq": 293.68,
+                  "ms": 220
+                }
+              ]
+            }
+          },
+          {
+            "id": "lead",
+            "role": "music",
+            "stage": 4,
+            "pattern": ["x..x..x...x.x...", "x..x..x.........", "x..x..x...x.x...", "x...x...x.......", "x..x..x...x.x...", "x..x..x.........", "x..x..x...x.x...", "x...x...x......."],
+            "notes": [36, 36, 39, 41, 43, 36, 36, 39, 36, 36, 39, 41, 46, 43, 41, 39, 36, 36, 39, 41, 43, 36, 36, 39, 36, 36, 39, 41, 46, 43, 41, 39],
+            "voice": {
+              "wave": "square",
+              "gain": 0.05,
+              "attackMs": 3,
+              "filter": {
+                "type": "lowpass",
+                "hz": 2600
+              },
+              "notes": [
+                {
+                  "freq": 293.68,
+                  "ms": 150
+                }
+              ]
+            }
+          },
+          {
+            "id": "crash",
+            "role": "drums",
+            "instrument": "perc",
+            "stage": 4,
+            "pattern": ["x...............", "................", "................", "................", "................", "................", "................", "................"],
+            "voice": {
+              "wave": "noise",
+              "gain": 0.05,
+              "attackMs": 2,
+              "filter": {
+                "type": "highpass",
+                "hz": 5000
+              },
+              "notes": [
+                {
+                  "freq": 6000,
+                  "ms": 1300
+                }
+              ]
+            }
+          },
+          {
+            "id": "alarm",
+            "role": "incident",
+            "pattern": ["x.......x.......", "x...x...x......."],
+            "notes": [24, 23, 24, 23, 27],
+            "voice": {
+              "wave": "square",
+              "gain": 0.05,
+              "attackMs": 5,
+              "filter": {
+                "type": "lowpass",
+                "hz": 3000
+              },
+              "notes": [
+                {
+                  "freq": 146.84,
+                  "ms": 260
+                }
+              ]
+            }
+          }
+        ]
       }
     ]
   }

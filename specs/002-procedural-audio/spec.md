@@ -161,12 +161,12 @@ previous volumes); open Pause, change music and effects volume, and hear the cha
 
 **Music**
 
-- **FR-005**: A looping music track in a minimal techno-pulse style — mostly rhythm and bass, with
+- **FR-005**: *(Superseded by feature 007 — drum & bass at a fixed 174 BPM; see [specs/007-drum-and-bass-music/](../007-drum-and-bass-music/spec.md) FR-001–FR-013b.)* A looping music track in a minimal techno-pulse style — mostly rhythm and bass, with
   little or no melody, sitting behind the sound effects — MUST start when a run starts and loop
   seamlessly while the run lasts.
-- **FR-006**: Music tempo MUST never decrease as difficulty rises, and MUST be at least 30% faster at
+- **FR-006**: *(Superseded by feature 007 — drum & bass at a fixed 174 BPM; see [specs/007-drum-and-bass-music/](../007-drum-and-bass-music/spec.md) FR-001–FR-013b.)* Music tempo MUST never decrease as difficulty rises, and MUST be at least 30% faster at
   difficulty level 20 than at level 1.
-- **FR-007**: Music intensity MUST increase at each enemy debut level (4, 8, 12, 16) — for example by
+- **FR-007**: *(Superseded by feature 007 — drum & bass at a fixed 174 BPM; see [specs/007-drum-and-bass-music/](../007-drum-and-bass-music/spec.md) FR-001–FR-013b.)* Music intensity MUST increase at each enemy debut level (4, 8, 12, 16) — for example by
   adding a musical layer.
 - **FR-008**: Music MUST be ducked to about half its volume while the game is paused or the level-up
   screen is open, and MUST return to full volume when play resumes.

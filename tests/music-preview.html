@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Music Preview</title>
+<style>
+  :root { color-scheme: dark; --bg: #050b16; --panel: #0b1626; --line: #1e3a5f; --text: #e2e8f0; --dim: #94a3b8; --accent: #22d3ee; --bad: #f87171; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; color: var(--accent); }
+  p { color: var(--dim); margin: 0 0 16px; }
+  section { background: var(--panel); border: 1px solid var(--line); padding: 14px 16px; margin: 0 0 14px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); margin: 0 0 10px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button { font: inherit; color: var(--text); background: #0f2238; border: 1px solid var(--line); padding: 8px 12px; min-height: 40px; cursor: pointer; }
+  button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+  button:focus-visible, input:focus-visible { outline: 3px solid #facc15; outline-offset: 2px; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  label { color: var(--dim); }
+  input[type=range] { accent-color: var(--accent); width: 200px; max-width: 100%; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; }
+  dt { color: var(--dim); }
+  dd { margin: 0; }
+  .errors { color: var(--bad); }
+  .meter { display: grid; grid-template-columns: repeat(32, 1fr); gap: 2px; margin-top: 10px; }
+  .meter span { height: 14px; background: #13263d; }
+  .meter span.fill { background: #a78bfa55; }
+  .meter span.breakdown { background: #f472b655; }
+  .meter span.now { background: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Music Preview</h1>
+  <p>Feature 007 listening checks (M-H1–M-H6, specs/007-drum-and-bass-music/quickstart.md). Not part of the game.</p>
+
+  <section aria-labelledby="h-start">
+    <h2 id="h-start">Sound</h2>
+    <div class="row">
+      <button id="start" type="button">Start</button>
+      <button id="stop" type="button" disabled>Stop</button>
+      <label for="vol">Music</label>
+      <input id="vol" type="range" min="0" max="100" step="10" value="60">
+      <output id="vol-out" for="vol">60%</output>
+    </div>
+    <p id="status" role="status" style="margin:10px 0 0">Press Start (browsers need a click before sound can play).</p>
+    <ul id="errors" class="errors" hidden></ul>
+  </section>
+
+  <section aria-labelledby="h-song">
+    <h2 id="h-song">Song</h2>
+    <div class="row" id="songs" role="group" aria-label="Song"></div>
+  </section>
+
+  <section aria-labelledby="h-stage">
+    <h2 id="h-stage">Build-up stage</h2>
+    <div class="row" id="stages" role="group" aria-label="Stage"></div>
+  </section>
+
+  <section aria-labelledby="h-tools">
+    <h2 id="h-tools">Checks</h2>
+    <div class="row">
+      <button id="jump" type="button">Jump to bar 25</button>
+      <button id="next" type="button">Next song (crossfade)</button>
+      <button id="incident" type="button" aria-pressed="false">Incident layer</button>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-now">
+    <h2 id="h-now">Now playing</h2>
+    <dl>
+      <dt>Song</dt><dd id="now-song">—</dd>
+      <dt>Style</dt><dd id="now-style">—</dd>
+      <dt>Bass</dt><dd id="now-bass">—</dd>
+      <dt>Stage</dt><dd id="now-stage">—</dd>
+      <dt>Cycle bar</dt><dd id="now-bar">—</dd>
+      <dt>Crossfade</dt><dd id="now-fade">—</dd>
+      <dt>Parts</dt><dd id="now-parts">—</dd>
+    </dl>
+    <div class="meter" id="meter" aria-hidden="true"></div>
+  </section>
+</main>
+<script type="module">
+import { validateAudioData } from '/audio/content.js';
+import { createAudio } from '/audio/synth.js';
+
+const $ = (id) => document.getElementById(id);
+const [audioData, gameData] = await Promise.all([
+  fetch('/data/audio.json').then((r) => r.json()),
+  fetch('/data/game.json').then((r) => r.json()),
+]);
+const result = validateAudioData(audioData, gameData);
+if (!result.ok) {
+  $('errors').hidden = false;
+  $('errors').replaceChildren(...result.errors.map((e) => Object.assign(document.createElement('li'), { textContent: `${e.id ?? ''} · ${e.path}: ${e.message}` })));
+  $('status').textContent = 'The audio data is invalid; nothing will play.';
+  for (const b of document.querySelectorAll('button')) b.disabled = true;
+  throw new Error('invalid audio data');
+}
+const music = audioData.music;
+const settings = { muted: false, musicVolume: 60, effectsVolume: 0 };
+const audio = createAudio(audioData, settings);
+window.__musicPreview = audio; // for the scripted check of this page (smoke-audio.html ?mode=preview)
+let song = music.songs[0].id;
+let stage = 4;
+let incident = false;
+
+const pressed = (group, value) => {
+  for (const b of $(group).querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.value === String(value)));
+};
+for (const s of music.songs) {
+  const b = Object.assign(document.createElement('button'), { type: 'button', textContent: `${s.name} (${s.style})` });
+  b.dataset.value = s.id;
+  b.addEventListener('click', () => { song = s.id; pressed('songs', song); play(); });
+  $('songs').append(b);
+}
+for (let s = 1; s <= 4; s++) {
+  const b = Object.assign(document.createElement('button'), { type: 'button', textContent: `Stage ${s}` });
+  b.dataset.value = String(s);
+  b.addEventListener('click', () => { stage = s; pressed('stages', stage); if (audio.status === 'running') audio.previewStage(stage); });
+  $('stages').append(b);
+}
+pressed('songs', song);
+pressed('stages', stage);
+for (let i = 1; i <= 32; i++) {
+  const cell = document.createElement('span');
+  if ([8, 16, 24].includes(i)) cell.className = 'fill';
+  if (i >= 29) cell.className = 'breakdown';
+  $('meter').append(cell);
+}
+
+function play() {
+  if (audio.status !== 'running') return;
+  audio.previewSong(song, stage);
+  audio.setIncident(incident);
+}
+
+$('start').addEventListener('click', async () => {
+  const status = await audio.start();
+  $('status').textContent = status === 'running' ? 'Sound on.' : `Sound unavailable${audio.stats().lastError ? `: ${audio.stats().lastError}` : ''}.`;
+  $('stop').disabled = status !== 'running';
+  play();
+});
+$('stop').addEventListener('click', () => { audio.stopMusic(); $('status').textContent = 'Stopped. Pick a song to play again.'; });
+$('vol').addEventListener('input', () => { audio.setMusicVolume(Number($('vol').value)); $('vol-out').textContent = `${$('vol').value}%`; });
+$('jump').addEventListener('click', () => audio.previewJump(25));
+$('next').addEventListener('click', () => audio.previewNext());
+$('incident').addEventListener('click', () => {
+  incident = !incident;
+  $('incident').setAttribute('aria-pressed', String(incident));
+  audio.setIncident(incident);
+});
+
+setInterval(() => {
+  const s = audio.stats();
+  const m = s.music;
+  const def = music.songs.find((x) => x.id === m.songId);
+  $('now-song').textContent = def ? def.name : '—';
+  $('now-style').textContent = def ? def.style : '—';
+  $('now-bass').textContent = def ? (def.bassAudibility === 'speakers' ? 'audible on speakers (upper bass layered)' : 'headphones-first (sub-led)') : '—';
+  $('now-stage').textContent = m.stage ?? '—';
+  $('now-bar').textContent = m.cycleBar ? `${m.cycleBar} / 32${m.cycleBar >= 29 ? ' (breakdown)' : [8, 16, 24].includes(m.cycleBar) ? ' (fill)' : ''}` : '—';
+  $('now-fade').textContent = m.crossfade ? `${m.crossfade.from} → ${m.crossfade.to}` : 'none';
+  $('now-parts').textContent = m.activeParts.map((k) => k.split('/')[1]).join(', ') || '—';
+  [...$('meter').children].forEach((c, i) => c.classList.toggle('now', i + 1 === m.cycleBar));
+  if (s.status === 'unavailable') $('status').textContent = `Sound unavailable${s.lastError ? `: ${s.lastError}` : ''}.`;
+}, 100);
+</script>
+</body>
+</html>

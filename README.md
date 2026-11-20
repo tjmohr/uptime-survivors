@@ -29,7 +29,9 @@ Testing URLs:
 
 - Fixed seed: `http://127.0.0.1:8000/?seed=12345`
 - Fast full run (each level 2 s, 40 s total): `http://127.0.0.1:8000/?seed=12345&levelSeconds=2`
-  — also the quickest way to hear the music speed up and gain layers
+- Hear the whole soundtrack (each level 10 s, each song 40 s): `http://127.0.0.1:8000/?seed=7&levelSeconds=10`
+- Music preview (pick any song and stage, jump to a breakdown, trigger a crossfade or the incident
+  layer — not part of the game): `http://127.0.0.1:8000/tests/music-preview.html`
 - Sound failure path: `http://127.0.0.1:8000/?audioFail=1` (game plays silently, HUD says "Sound unavailable")
 - Frame-rate overlay (for measuring phones): `?fps=1`
 
@@ -144,11 +146,25 @@ Field Guide) a bonus from passives or Capacity Planning appears next to the rank
 
 ## Sound
 
-Nothing plays until you press **Start**. Then a minimal techno pulse plays behind the action: it
-starts at 118 BPM with kick and bass, speeds up every difficulty level (156 BPM at level 20), and adds
-a layer each time a new threat arrives (hats at 4, clap at 8, open hat and percussion at 12, a
-filtered stab at 16). It is quieter while paused or choosing an upgrade, stops at the end of a run,
-and restarts from the beginning for every new run.
+Nothing plays until you press **Start**. Then drum & bass plays behind the action at a steady
+174 BPM (feature 007). There are five original songs, one per sub-style, with network-themed names:
+
+| Song | Style | Bass |
+|------|-------|------|
+| Uplink | Liquid — rolling break, warm chords, round sub | headphones-first |
+| Handshake | Jump-up — bouncy two-step, wobbling "talking" bass | audible on phone/laptop speakers |
+| Packet Storm | Neurofunk — tight drums, gritty detuned "reese" bass | audible on phone/laptop speakers |
+| Backbone | Jungle — chopped break with ghost notes, long sliding sub, off-beat skank | headphones-first |
+| Uptime | Dancefloor — big clap, driven bass, stabs and a lead hook | audible on phone/laptop speakers |
+
+A run is cut into five 4-level blocks (difficulty 1–4, 5–8, 9–12, 13–16, 17–20), each with one song.
+The order is a shuffle drawn from the run's seed — no repeats, and Replay Seed gives the same
+soundtrack. Each song starts its block with drums and bass and adds parts at each of its four levels.
+Every 32 bars a song plays drum fills (bars 8, 16, 24) and a 4-bar breakdown before the drums drop
+back in. Songs change with a 2-bar crossfade on the beat, with the bass swapped DJ-style (the old bass
+leaves after bar 1, the new bass comes in on bar 2). During a Major Incident each song adds an
+incident layer in its own key. Music is quieter while paused or choosing an upgrade, stops at the end
+of a run, and restarts from the new run's first song.
 
 Ten short effects mark the main events: Ping / Load Balancer firing (shared), the Ansible Playbook
 pulse, the engineer taking damage, a hit (Firewall Rule contacts use it too), a defeat, telemetry
@@ -156,22 +172,22 @@ collected, level-up, a new threat, a win, and a loss. Repeats are rate-limited a
 sound at once, so a big horde never turns into a buzz.
 
 Every sound is generated in code with the browser's Web Audio API — the repository contains no audio
-files and nothing is downloaded. All sound design (voices, patterns, tempos, volumes, limits) is in
+files and nothing is downloaded. All sound design (voices, songs, patterns, stages, tempo, volumes, limits) is in
 [`data/audio.json`](data/audio.json) and is validated with the game data before Start. Default
 volumes are Music 60% and Effects 80%; settings last until you reload the page (nothing is saved).
 Sound never changes gameplay: runs with the same seed and inputs are identical with sound on, muted,
-or unavailable. Every sounded event keeps its visual feedback.
+or unavailable (the song order uses its own random sequence, never the game's). Every sounded event keeps its visual feedback.
 
 ## Status
 
 First playable is built: all 5 enemies, 7 tools, 6 passives, Capacity Planning, and 20 difficulty levels, plus
-synthesized sound effects and music (feature 002). Automated and scripted-browser checks pass (see
+synthesized sound effects (feature 002) and a drum & bass soundtrack of five generated songs (feature 007). Automated and scripted-browser checks pass (see
 Verification), and touch play on phones and tablets (feature 003) is checked in emulated phones with
 real touch input. **Still outstanding:** a human playthrough, checks on real phones (feature 003
 H1–H5) and a phone playtest (H6), the 5-player playtest (F10: SC-010, SC-011), a human review of the networking descriptions (SC-007), human listening tests for the sound
 (H1–H3), Field Guide checks with a real screen reader, on real phones, and a playtest (GH1–GH3), and
-checks in browsers other than Chrome. The Field Guide (feature 005) passes its automated and scripted
-checks.
+checks in browsers other than Chrome, and listening checks for the final drum & bass songs (M-H1–M-H6). The Field
+Guide (feature 005) and the drum & bass soundtrack (feature 007) pass their automated and scripted checks.
 
 ### Known limits
 
@@ -179,9 +195,14 @@ checks.
   has played it end to end yet.
 - `node tests/run.mjs` has not been run (no Node on the verifying machine); the same tests pass in
   JavaScriptCore and in the browser.
-- Only Chrome was tested; Firefox, Safari, and Edge are untested — including their Web Audio output.
-- Sound checks run in headless Chrome, which can report what is scheduled and the gain levels but
-  cannot judge how it sounds. Nobody has listened to the sound yet (H1–H3 not run).
+- Only Chrome was tested by script; Firefox, Safari, and Edge are untested by script — including their
+  Web Audio output. Feature 007's music was played by the owner in Firefox on macOS after one fix: the
+  crossfade used a Web Audio call (`setValueCurveAtTime`) that Firefox rejects, which stopped the music
+  at the first song change; it now uses plain volume ramps. Headless Firefox would not run here.
+- Sound checks run in headless Chrome, which can report what is scheduled, the gain levels, and (B11)
+  measured band energy and loudness, but cannot judge how it sounds. The owner listened to an early
+  version of the drum & bass music (placeholder songs) and liked it, except some ghost-note snares;
+  the final songs' listening checks M-H1–M-H6 have not been run, nor H1–H3 for the effects.
 - With `?levelSeconds=2`, difficulty rises 30× faster than levelling, so those runs usually end in a
   loss; use `?levelSeconds=0.5` to see the win screen quickly.
 - Late-game upgrades (feature 006): balance was tuned with scripted bots only (tool floor and front-loaded passives
@@ -206,7 +227,8 @@ Scenarios are defined in
 (U, T, and "Phone H" rows: touch and mobile), and [`specs/004-major-incidents/quickstart.md`](specs/004-major-incidents/quickstart.md)
 ("I-" rows: Major Incidents), and [`specs/005-field-guide/quickstart.md`](specs/005-field-guide/quickstart.md)
 (G, GB, GH rows: Field Guide), and [`specs/006-late-game-upgrades/quickstart.md`](specs/006-late-game-upgrades/quickstart.md)
-("L-" rows: late-game upgrades). A checked task box is not evidence; this table is. Unrun checks stay visible
+("L-" rows: late-game upgrades), and [`specs/007-drum-and-bass-music/quickstart.md`](specs/007-drum-and-bass-music/quickstart.md)
+("M-U", "M-B" and "M-H" rows: drum & bass music). A checked task box is not evidence; this table is. Unrun checks stay visible
 as "not run". M1/F1 record the test count when feature 001 was verified; the current count is in A1–A5.
 
 | # | Check | Result | Date | Environment | Evidence / notes |
@@ -235,14 +257,14 @@ as "not run". M1/F1 record the test count when feature 001 was verified; the cur
 | A1 | Sound data validation | pass | 2026-11-19 | jsc + Chrome 157 headless | Shipped `data/audio.json` passes; broken copies fail naming the path (missing/unknown effect, bad wave/filter, empty notes, effect > 1 s, win/loss > 3 s, pattern ≠ 16 steps or no `x`, layer voice > one beat, `bpmEnd` < 1.3 × `bpmStart`, no layer at level 1 or at a debut level, duplicate layer id, unknown fields, bad defaults/mix). In the browser, errors from both data files are listed together and Start is not offered. |
 | A2 | Event → sound mapping | pass | 2026-11-19 | jsc + Chrome 157 headless | Each engine event maps to its effect; 3 level-ups in one frame → 1 `levelUp`; `run-ended` → one win/loss; events never mutated. |
 | A3 | Effect limiting | pass | 2026-11-19 | jsc + Chrome 157 headless | Hit flood (9 per frame for 1 s): ≥ 60 ms between hit sounds; never more than 8 effects sounding; excess dropped, not queued; damage stream limited to 1 per 150 ms. |
-| A4 | Tempo and layers | pass | 2026-11-19 | jsc + Chrome 157 headless | Tempo non-decreasing, 118 → 156 BPM (+32%); a new layer at each debut level 4, 8, 12, 16. |
+| A4 | Tempo and layers | superseded | 2026-11-19 | | **Superseded by feature 007** (fixed 174 BPM; see M-U rows). Original result: | jsc + Chrome 157 headless | Tempo non-decreasing, 118 → 156 BPM (+32%); a new layer at each debut level 4, 8, 12, 16. |
 | A5 | Determinism with sound | pass | 2026-11-19 | jsc + Chrome 157 headless | `fire` (once per volley, projectile tools only) and `pickup` events reported; identical `hashRun` with and without a director consuming events (the engine never sees mute/volume/availability, so this covers SC-006's on/muted/unavailable cases). 98/98 tests pass. |
 | A6 | No audio files | pass | 2026-11-19 | `tests/browser/drive.py` file scan + source scan test | 0 audio files in the repository; `audio/*.js` contains no `fetch`, dynamic import, URLs, or `Audio` elements. |
 | B1 | Silent title screen | pass | 2026-11-19 | Chrome 157 headless, autoplay allowed; scripted (`tests/browser/drive.py --only audio`) | Status `idle`, no audio context, nothing counted after 1 s on the title. |
 | B2 | Sound on Start | pass | 2026-11-19 | Chrome 157 headless, autoplay allowed; scripted | Running ~105–135 ms after Start (SC-001 ≤ 500 ms); kick + bass playing; fire, hit, defeat, newThreat, pickup, levelUp and damage sounds counted; HUD "♪ Sound on (M)". Pulse is covered by A2 only (Ansible was not picked in that run). |
 | B3 | Mute (M) | pass | 2026-11-19 | Chrome 157 headless, autoplay allowed; scripted | M on the title → run starts muted; M mid-run silences the master gain in ~65 ms (SC-002 ≤ 100 ms); unmute restores 60/80 volumes; window blur suspends sound and pauses, focus resumes with music ducked. |
 | B4 | Pause-screen controls and ducking | pass | 2026-11-19 | Chrome 157 headless, autoplay allowed; scripted | Music ducked to 0.5 while paused and on level-up screens, back to 1 after; Sound button and Music/Effects sliders (0–100, step 10, labelled with %); arrow keys on a slider are left to it; Music 30% → gain 0.09; Effects 0% → effects silent while music continues; settings kept across Quit to Title and a new run, which restarts music at level 1. Slider values were set by script, not dragged. |
-| B5 | Music builds through a run | pass | 2026-11-19 | Chrome 157 headless, autoplay allowed; scripted, `?levelSeconds=2`, test-only invincibility | Music heard at all levels 1–20; BPM 118 → 156 (×1.32), never decreasing; layers 2 → 3 → 4 → 6 → 7 at levels 4, 8, 12, 16; every layer played; music stopped at the end and exactly one win sound played. |
+| B5 (002) | Music builds through a run | superseded | 2026-11-19 | | **Superseded by feature 007** (M-B5). Original result: | Chrome 157 headless, autoplay allowed; scripted, `?levelSeconds=2`, test-only invincibility | Music heard at all levels 1–20; BPM 118 → 156 (×1.32), never decreasing; layers 2 → 3 → 4 → 6 → 7 at levels 4, 8, 12, 16; every layer played; music stopped at the end and exactly one win sound played. |
 | B6 | Sound unavailable | pass | 2026-11-19 | Chrome 157 headless, `?audioFail=1` | Game keeps playing (120 ticks in 2 s); HUD and live region say "Sound unavailable"; no error screen. |
 | B7 | Smooth with sound and ~300 enemies | pass | 2026-11-19 | Chrome 157 headless (software rendering) on the dev Mac | 300 enemies with sound on: avg 16.7 ms/frame (60 fps), p95 16.7 ms; hit sounds limited to a handful per 5 s. Same machine caveat as F5. |
 | B8 | Same-origin, no audio downloads | pass | 2026-11-19 | Chrome 157 headless; scripted | 22 requests during a run, 0 to other origins, 0 audio files (`data/audio.json` is the only sound-related request). |
@@ -313,6 +335,23 @@ as "not run". M1/F1 record the test count when feature 001 was verified; the cur
 | L-B4 | Regression and performance | pass | 2026-11-19 | Chrome 157 headless (incl. DevTools-driven phones); jsc | Final run (with the tool floor, front-loaded passives, and standing incident alerts): full `python3 tests/browser/drive.py` 51/51 checks pass (features 001–006) in 709 s; `jsc -m tests/run.mjs` 165/165. 300 enemies with all three new tools at rank 5: 60 fps (p95 16.8 ms); phone fit T6 passes at 360×640 to 1024×768 with the longer level-up text; throttled phone T9 55–60 fps. The first full run found a real bug (stat lines built with `.map(describeStatChange)` showed "(0 with bonuses)"; fixed by a separate `describeStatWithBonus`) and three Major Incident checks that timed out once; they pass alone, as a group, and in the full re-run. |
 | L-H1 | Concepts recognisable (SC-005) | not run |  |  | Needs a reviewer to name each new item's concept from its name and description. |
 | L-H2 | Late-game playtest (SC-006) | not run |  |  | Needs 5 players; also judge whether the tool floor feels forced. |
+| M-U1–M-U9 | Drum & bass unit tests (data, song order, blocks/stages, phrase cycle, crossfade gains and bass swap, arrangement state, validation with song/part ids, purity and determinism) | pass | 2026-11-19 | jsc | 180/180 unit tests pass in `jsc -m tests/run.mjs`, including `tests/music.test.js` and `tests/audio-content.test.js`. Seeds 1–30 give ≥ 10 song orders and every song opens a run for some seed (SC-003); a seeded run's hash is unchanged by the music (SC-006). |
+| M-B5 | 174 BPM, five songs, seeded order | pass | 2026-11-19 | Chrome 157 headless, `?seed=7&levelSeconds=3`; scripted | 697 step gaps measured on the audio clock across the whole run (song and stage changes included), 0 off the 86.2 ms grid, 0 skipped steps; songs started at levels 1/5/9/13/17 in `songOrder(7)` order (Uplink, Packet Storm, Handshake, Uptime, Backbone); all 20 block/stage pairs seen with the stage following the level; win, one end sound, music stopped. |
+| M-B9 | Replay Seed, same soundtrack | pass | 2026-11-19 | Chrome 157 headless, `?seed=7&levelSeconds=2` | Two runs (Start, then Replay Seed) gave the same order and the same five song starts, matching `songOrder(7)`. |
+| M-B10 | Crossfade and bass swap | pass | 2026-11-19 | Chrome 157 headless, `?seed=7&levelSeconds=4` | Liquid → Neurofunk crossfade lasted 2.768 s on the audio clock (2 bars = 2.759 s); never more than 2 songs live; 52 samples with the outgoing bass and 54 with the incoming bass, 0 with both; sound still running after the change. |
+| M-B11 | Bass on small speakers, loudness (automated stand-in) | pass | 2026-11-19 | Chrome 157 headless, `OfflineAudioContext` renders | 16 bars of each song's stage-4 arrangement rendered offline. Loudness within 1.3 dB of the median (−21.2 to −23.2 dBFS). Bass parts alone, 150 Hz–1 kHz vs their sub band: Handshake −7.1 dB, Packet Storm −10.6 dB, Uptime (Dancefloor) −11.2 dB (all ≥ −20, audible on small speakers); the headphones-first songs Uplink −24.1 dB and Backbone −25.2 dB. A stand-in for M-H5, not a listening test. |
+| M-B12 | Muted play and a hidden tab mid-crossfade | pass | 2026-11-19 | Chrome 157 headless | Songs kept changing while muted (song change at level 5, stage 2 at level 6); `pagehide` mid-crossfade suspended sound, and after `pageshow` one song was live within 2 bars and no song was recorded twice. |
+| M-B-preview | Music preview page | pass | 2026-11-19 | Chrome 157 headless | Start, song and stage buttons, "Jump to bar 25" (breakdown at bar 29 with no drums), incident toggle, and "Next song" crossfade all drive the real synth. |
+| M-B-perf | Frame rate with the new music (SC-008) | pass | 2026-11-19 | Chrome 157 headless; CPU 4× slower for T9 | B7 (300 enemies, desktop): avg 16.7 ms, p95 16.7 ms — same as the old music's baseline (≤ +1 ms). T9 (390×844, CPU 4× slower): 162 enemies avg 60 fps, 312 enemies avg 60 fps (baseline 52), but the adaptive quality stepped down one level at 312 enemies (baseline: none). Within the existing limits; watch on real phones. |
+| M-B-regression | Full browser suite | pass | 2026-11-19 | Chrome 157 headless (incl. DevTools-driven phones); jsc | `python3 tests/browser/drive.py`: 56/56 checks pass in 904 s (features 001–007); `jsc -m tests/run.mjs`: 180/180. |
+| M-Firefox | Plays through song changes in Firefox | pass (owner) | 2026-11-19 | Firefox on macOS, played by the owner, placeholder songs | After the crossfade fix the music kept playing through the song changes. Firefox has not been scripted. |
+| Music originality | Asset review (C1) | pass (AI review) | 2026-11-19 | Claude (AI agent) review of `data/audio.json` | All five songs were written for this project as data: generic drum & bass rhythm figures (two-step, breakbeat-style patterns played from original step patterns, no samples or recordings), original bass lines, chord progressions and hooks. No melody or break is copied from a known record. A human has not reviewed this. |
+| M-H1 | Five songs sound distinct (SC-007) | not run |  |  | Needs a listener: tell all five apart and match ≥ 4 to their styles (preview page). |
+| M-H2 | Build-up stages (FR-010) | not run |  |  | Needs a listener to step one song through stages 1–4. |
+| M-H3 | Fills and breakdowns (FR-013a) | not run |  |  | Needs a listener: "Jump to bar 25" on the preview page. |
+| M-H4 | Crossfade sounds clean (SC-004) | not run |  |  | Needs a listener: "Next song" several times — no click, gap, or beat slip. |
+| M-H5 | Bass on a phone speaker (SC-007a) | not run |  |  | Needs a listener with a phone: bass line easy to follow in ≥ 3 songs. |
+| M-H6 | Incident layer fits (FR-012) | not run |  |  | Needs a listener: incident toggle on the preview page. |
 
 ## Project layout
 
@@ -323,9 +362,10 @@ engine/                          Pure game rules (no DOM, seeded randomness); in
 ui/                              Canvas rendering, HUD, screens, keyboard + touch input, URL params;
                                  pure helpers joystick.js, tapguard.js, view.js; touchmode.js;
                                  Field Guide model guide.js, icons.js, stattext.js (pure)
-audio/                           Sound: data validation and event→sound decisions (pure), Web Audio synth
+audio/                           Sound: data validation, event→sound decisions and the drum & bass arranger
+                                 (arrange.js) are pure; synth.js is the Web Audio synth
 data/game.json                   All enemies, tools, passives, difficulty, tuning
-data/audio.json                  All sound design: effects, music layers, tempos, volumes, limits
+data/audio.json                  All sound design: effects, the five songs (parts, patterns, stages), tempo, volumes, limits
 tests/                           Test harness, browser + terminal runners, tests; balance/ = incident simulation
 specs/001-survivors-first-playable/   Spec, plan, tasks, contracts, quickstart
 specs/002-procedural-audio/      Sound feature: spec, plan, tasks, contracts, quickstart
@@ -333,6 +373,7 @@ specs/003-mobile-touch/          Touch and mobile feature: spec, plan, tasks, co
 specs/004-major-incidents/       Major Incidents feature: spec, plan, tasks, contracts, quickstart
 specs/005-field-guide/           Field Guide feature: spec, plan, tasks, contracts, quickstart
 specs/006-late-game-upgrades/    Late-game upgrades feature: spec, plan, tasks, contracts, quickstart
+specs/007-drum-and-bass-music/   Drum & bass soundtrack: spec, plan, tasks, contracts, quickstart
 ```
 
 ## License

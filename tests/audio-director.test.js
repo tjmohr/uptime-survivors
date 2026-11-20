@@ -1,6 +1,6 @@
 // A2–A4: director mapping, limiting, tempo and layers — specs/002-procedural-audio/quickstart.md.
 import { test, assert, assertEqual, loadGameData, readSource } from './harness.js';
-import { createDirector, bpmForLevel, layersForLevel } from '../audio/director.js';
+import { createDirector } from '../audio/director.js';
 import { voiceDurationMs } from '../audio/content.js';
 
 let cached = null;
@@ -108,31 +108,6 @@ test('director: damage stream is limited too (player-hit every step)', async () 
   assert(n <= Math.ceil(1000 / audio.effects.damage.minIntervalMs), `${n} damage sounds in 1 s`);
 });
 
-test('director: tempo never decreases and is ≥ 30% faster at level 20 (A4)', async () => {
-  const audio = await loadAudio();
-  let prev = 0;
-  for (let l = 1; l <= 20; l++) {
-    const bpm = bpmForLevel(audio, l);
-    assert(bpm >= prev, `bpm fell at level ${l}`);
-    prev = bpm;
-  }
-  assertEqual(bpmForLevel(audio, 1), audio.music.bpmStart);
-  assertEqual(bpmForLevel(audio, 20), audio.music.bpmEnd);
-  assert(bpmForLevel(audio, 20) >= 1.3 * bpmForLevel(audio, 1));
-});
-
-test('director: a layer joins at every enemy debut level (A4, FR-007)', async () => {
-  const audio = await loadAudio();
-  const game = await loadGameData();
-  assert(layersForLevel(audio, 1).length > 0, 'music audible at level 1');
-  for (const e of game.enemies) {
-    if (e.debutLevel === 1) continue;
-    assert(layersForLevel(audio, e.debutLevel).length > layersForLevel(audio, e.debutLevel - 1).length,
-      `no new layer at level ${e.debutLevel}`);
-  }
-  for (let l = 2; l <= 20; l++) assert(layersForLevel(audio, l).length >= layersForLevel(audio, l - 1).length);
-});
-
 test('director: incident sounds always play, even with 8 effects sounding (U7, 004 FR-017)', async () => {
   const audio = await loadAudio();
   for (const name of Object.keys(audio.effects)) audio.effects[name].minIntervalMs = 0;
@@ -156,12 +131,6 @@ test('director: incident sounds always play, even with 8 effects sounding (U7, 0
   assertEqual(d.consume([], 7).incidentActive, false, 'reset clears the incident count');
 });
 
-test('director: the incident layer is not a level layer (U7)', async () => {
-  const audio = await loadAudio();
-  for (let l = 1; l <= 20; l++) assert(!layersForLevel(audio, l).some((x) => x.trigger === 'incident'));
-});
-
-// Feature 006 (T040): the new tools sound through the existing effects.
 test('director: Null Route placement plays pulse; a Traceroute chain plays fire (feature 006)', async () => {
   let d = createDirector(await loadAudio());
   assertEqual(d.consume([{ type: 'zone-placed', x: 0, y: 0, radius: 60, duration: 2.5 }], 1000).effects, ['pulse']);

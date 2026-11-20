@@ -3,13 +3,15 @@
 <body>
 <iframe id="f" width="1280" height="800"></iframe>
 <script type="module">
-// Scripted audio checks B1–B8 (specs/002-procedural-audio/quickstart.md). Run by tests/browser/drive.py
+// Scripted audio checks B1–B8 (specs/002-procedural-audio/quickstart.md) and the drum & bass checks B5, B9, B10,
+// B12 (specs/007-drum-and-bass-music/quickstart.md). Run by tests/browser/drive.py
 // with --autoplay-policy=no-user-gesture-required, because a scripted click is not a user gesture.
 import { spawnEnemy } from '/engine/spawner.js';
 import { rowFor } from '/engine/difficulty.js';
 import { addTelemetry } from '/engine/progression.js';
 import { addPickup } from '/engine/combat.js';
-import { layersForLevel } from '/audio/director.js';
+import { songOrder, stageForLevel } from '/audio/arrange.js';
+import { createAudio } from '/audio/synth.js';
 const mode = new URLSearchParams(location.search).get('mode');
 const results = { mode };
 const frame = document.getElementById('f');
@@ -25,6 +27,18 @@ const key = (type, code, target) => {
 };
 const press = (code, target) => { const ev = key('keydown', code, target); key('keyup', code, target); return ev; };
 const hudSound = () => doc().getElementById('hud-sound').textContent;
+// Feature 007: hits counted per "song/part"; kicks and subs exist in every song.
+const hitsOf = (suffix) => Object.entries(A().music.partCounts).filter(([k]) => k.endsWith(suffix)).reduce((n, [, v]) => n + v, 0);
+const kicks = () => hitsOf('/kick');
+let audioData = null;
+async function musicData() {
+  if (!audioData) audioData = JSON.parse(await (await fetch('/data/audio.json')).text()).music;
+  return audioData;
+}
+const isBass = (music, key) => {
+  const [songId, partId] = key.split('/');
+  return music.songs.find((x) => x.id === songId)?.parts.find((x) => x.id === partId)?.role === 'bass';
+};
 async function until(fn, ms = 20000, label = '') {
   const t0 = performance.now();
   while (performance.now() - t0 < ms) { try { if (fn()) return true; } catch {} await sleep(20); }
@@ -72,7 +86,7 @@ try {
     await until(() => A().status === 'running' && A().contextState === 'running', 2000, 'audio running');
     const startMs = performance.now() - t0;
     await sleep(600);
-    const layersEarly = { ...A().layerCounts };
+    const layersEarly = { kick: kicks(), bass: hitsOf('/sub'), bpm: A().music.bpm };
     await play(15000);
     // Drop telemetry on the engineer and force a level-up so pickup, levelUp and damage are heard too.
     const e = G().run.engineer;
@@ -86,9 +100,9 @@ try {
     await until(() => A().effectCounts.damage > 0, 3000, 'damage sound').catch(() => {});
     const s = A();
     const need = ['fire', 'hit', 'defeat', 'newThreat', 'pickup', 'levelUp', 'damage'];
-    results.B2 = { pass: startMs <= 500 && s.musicPlaying && layersEarly.kick > 0 && layersEarly.bass > 0 &&
+    results.B2 = { pass: startMs <= 500 && s.musicPlaying && layersEarly.kick > 0 && layersEarly.bass > 0 && layersEarly.bpm === 174 &&
       need.every((n) => s.effectCounts[n] > 0) && hudSound() === '♪ Sound on (M)',
-      note: `running ${startMs.toFixed(0)} ms after Start; music ${s.musicPlaying}, layers ${s.activeLayers.join('+')} (counts after 0.6 s ${JSON.stringify(layersEarly)}); effects ${JSON.stringify(s.effectCounts)}; HUD '${hudSound()}'` };
+      note: `running ${startMs.toFixed(0)} ms after Start; music ${s.musicPlaying}, song ${s.music.songId} stage ${s.music.stage}, parts ${s.music.activeParts.join('+')} (after 0.6 s ${JSON.stringify(layersEarly)}); effects ${JSON.stringify(s.effectCounts)}; HUD '${hudSound()}'` };
 
     const entries = W().performance.getEntriesByType('resource').map((e) => e.name);
     const foreign = entries.filter((u) => new URL(u).origin !== W().location.origin);
@@ -104,7 +118,7 @@ try {
     const errs = [...doc().querySelectorAll('#overlay .errors li')].map((li) => li.textContent);
     const hasStart = [...doc().querySelectorAll('#overlay button')].some((b) => b.textContent === 'Start');
     results.A1browser = { pass: !hasStart && errs.some((e) => e.includes('enemies[1].id')) &&
-      errs.some((e) => e.includes('data/audio.json › effects.hit')) && errs.some((e) => e.includes('data/audio.json › music.layers[0].pattern')),
+      errs.some((e) => e.includes('data/audio.json › effects.hit')) && errs.some((e) => e.includes('data/audio.json › music.songs[0].parts[0].pattern')),
       note: `Start offered: ${hasStart}; errors: ${errs.join(' | ')}` };
   }
 
@@ -149,9 +163,9 @@ try {
     const suspended = `${A().status}/${A().contextState}/${G().run.phase}`;
     W().dispatchEvent(new (W().Event)('focus'));
     await until(() => A().status === 'running' && A().contextState === 'running', 2000, 'resumed').catch(() => {});
-    const kicks = A().layerCounts.kick;
+    const kicks0 = kicks();
     await sleep(1200);
-    const resumed = `${A().status}/${A().contextState}/${G().run.phase}/ducked ${A().ducked}/music ${A().layerCounts.kick > kicks}`;
+    const resumed = `${A().status}/${A().contextState}/${G().run.phase}/ducked ${A().ducked}/music ${kicks() > kicks0}`;
     const focusOk = suspended === 'suspended/suspended/paused' && resumed === 'running/running/paused/ducked true/music true';
     results.B3 = { pass: titleMuted && startedMuted && unmutedOk && muteMs <= 100 && mutedHud === 'Sound off (M)' &&
       JSON.stringify(before) === JSON.stringify(after) && !A().muted && focusOk,
@@ -203,9 +217,9 @@ try {
     await sleep(100);
     expect(!A().ducked && A().gains.duck > 0.99, 'unducked after resume');
     // Music keeps playing at Effects 0%.
-    const kicks = A().layerCounts.kick;
+    const kicks0 = kicks();
     await sleep(1500);
-    expect(A().layerCounts.kick > kicks, 'music continues with Effects at 0%');
+    expect(kicks() > kicks0, 'music continues with Effects at 0%');
     const total = () => Object.values(A().effectCounts).reduce((x, y) => x + y, 0);
     const played = total();
     await until(() => total() > played, 8000, 'an effect after resume').catch(() => {});
@@ -235,35 +249,215 @@ try {
   }
 
   if (mode === 'b5') {
-    await load('/index.html?seed=12345&levelSeconds=2');
+    // 007 B5: fixed 174 BPM measured on the audio clock; five songs at levels 1/5/9/13/17 in the seed's order.
+    await load('/index.html?seed=7&levelSeconds=3');
     await clickStart();
     await until(() => A().status === 'running', 2000, 'running');
-    const data = JSON.parse(await (await fetch('/data/audio.json')).text());
-    const samples = [];
-    let ok = true;
-    await play(60000, () => {
+    const music = await musicData();
+    const stepS = 60 / 174 / 4;
+    let gaps = 0;
+    let badGaps = [];
+    let lastStep = null;
+    let stageBad = [];
+    let prevLevel = 1;
+    const stagesSeen = new Set();
+    await play(80000, () => {
       const s = A();
       if (!s.musicPlaying) return;
-      samples.push({ level: s.level, bpm: s.bpm, layers: s.activeLayers.filter((id) => id !== 'incident-alarm').length });
-      // The incident layer (feature 004) comes and goes with Major Incidents; compare level layers only.
-      if (s.activeLayers.filter((id) => id !== 'incident-alarm').length !== layersForLevel(data, s.level).length) ok = false;
+      for (const t of s.music.stepTimes) {
+        if (lastStep !== null && t > lastStep + 1e-6) {
+          const k = Math.round((t - lastStep) / stepS);
+          if (k < 1 || Math.abs(t - lastStep - k * stepS) > 0.0002) badGaps.push(((t - lastStep) * 1000).toFixed(2));
+          gaps += 1;
+        }
+        if (lastStep === null || t > lastStep + 1e-6) lastStep = t;
+      }
+      const lvl = s.level;
+      const okStage = s.music.stage === stageForLevel(lvl) || s.music.stage === stageForLevel(prevLevel);
+      if (!okStage) stageBad.push(`L${lvl}:S${s.music.stage}`);
+      stagesSeen.add(`${s.music.block}:${s.music.stage}`);
+      if (lvl !== prevLevel && s.music.stage === stageForLevel(lvl)) prevLevel = lvl;
     });
     await until(() => G().run.phase === 'ended', 10000, 'run end');
     await sleep(300);
     const s = A();
-    let nonDecreasing = true;
-    for (let i = 1; i < samples.length; i++) {
-      if (samples[i].bpm < samples[i - 1].bpm || samples[i].layers < samples[i - 1].layers) nonDecreasing = false;
-    }
-    const first = samples[0];
-    const last = samples[samples.length - 1];
-    const levels = [...new Set(samples.map((x) => x.level))];
-    const layerGrowth = [...new Set(samples.map((x) => `${x.level}:${x.layers}`))].filter((x, i, arr) => i === 0 || arr[i - 1].split(':')[1] !== x.split(':')[1]);
-    const allLayersPlayed = Object.values(s.layerCounts).every((n) => n > 0);
+    const starts = s.music.songStarts;
+    const expected = songOrder(7, music.songs);
+    const startsOk = JSON.stringify(starts.map((x) => x.level)) === '[1,5,9,13,17]' &&
+      JSON.stringify(starts.map((x) => x.songId)) === JSON.stringify(expected) && starts.every((x) => Number.isInteger(x.bar));
     const endSounds = s.effectCounts.win + s.effectCounts.loss;
-    results.B5 = { pass: ok && nonDecreasing && last.bpm >= 1.3 * first.bpm && allLayersPlayed && !s.musicPlaying &&
-      endSounds === 1 && s.effectCounts[G().run.outcome] === 1,
-      note: `music levels heard ${levels.join(',')}; bpm ${first.bpm} → ${last.bpm.toFixed(1)} (×${(last.bpm / first.bpm).toFixed(2)}); layer count changes ${layerGrowth.join(' ')}; layers match level: ${ok}; layer hits ${JSON.stringify(s.layerCounts)}; outcome ${G().run.outcome}, end sounds ${endSounds}, music playing after end ${s.musicPlaying}` };
+    results.B5 = { pass: gaps > 500 && badGaps.length === 0 && s.music.bpm === 174 && startsOk && stageBad.length === 0 &&
+      stagesSeen.size === 20 && !s.musicPlaying && endSounds === 1 && s.effectCounts[G().run.outcome] === 1,
+      note: `${gaps} step gaps measured, off-grid ${badGaps.length} ${badGaps.slice(0, 5).join(',')}; song starts ${starts.map((x) => `L${x.level}:${x.songId}@bar${x.bar}`).join(' ')} (expected ${expected.join(',')}); block:stage pairs seen ${stagesSeen.size}/20; stage mismatches ${stageBad.slice(0, 5).join(',') || 'none'}; outcome ${G().run.outcome}, end sounds ${endSounds}, music after end ${s.musicPlaying}; skipped steps ${s.music.skippedSteps}` };
+  }
+
+  if (mode === 'b9') {
+    // 007 B9: Replay Seed gives the same soundtrack.
+    await load('/index.html?seed=7&levelSeconds=2');
+    const music = await musicData();
+    const runs = [];
+    await clickStart();
+    for (let i = 0; i < 2; i++) {
+      await until(() => A().status === 'running', 2000, 'running');
+      await play(60000);
+      await until(() => G().run.phase === 'ended', 10000, 'run end');
+      runs.push({ order: A().music.order, songs: A().music.songStarts.map((x) => x.songId), seed: G().run.seed });
+      if (i === 0) {
+        await until(() => [...doc().querySelectorAll('#overlay button')].some((b) => b.textContent === 'Replay Seed'), 5000, 'end screen');
+        [...doc().querySelectorAll('#overlay button')].find((b) => b.textContent === 'Replay Seed').click();
+        await until(() => G().run.phase === 'playing' && G().run.tick < 30, 3000, 'replay');
+      }
+    }
+    const expected = songOrder(7, music.songs);
+    const same = JSON.stringify(runs[0]) === JSON.stringify(runs[1]);
+    results.B9 = { pass: same && JSON.stringify(runs[0].order) === JSON.stringify(expected) && runs[0].songs.length === 5 &&
+      new Set(runs[0].songs).size === 5,
+      note: `run 1 ${JSON.stringify(runs[0])}; replay ${JSON.stringify(runs[1])}; expected order ${expected.join(',')}` };
+  }
+
+  if (mode === 'b10') {
+    // 007 B10: a song change is a 2-bar crossfade; at most two songs; never both basses in one bar.
+    await load('/index.html?seed=7&levelSeconds=4');
+    await clickStart();
+    await until(() => A().status === 'running', 2000, 'running');
+    const music = await musicData();
+    let maxLive = 0;
+    let fadeStart = null;
+    let fadeEnd = null;
+    let fade = null;
+    let both = 0;
+    let outBass = 0;
+    let inBass = 0;
+    await play(30000, () => {
+      const m = A().music;
+      maxLive = Math.max(maxLive, m.liveSongs.length);
+      if (fadeEnd !== null) return;
+      if (m.crossfade && fadeStart === null) { fadeStart = m.audioTime; fade = m.crossfade; }
+      if (fade) {
+        const bass = m.activeParts.filter((k) => isBass(music, k));
+        const o = bass.some((k) => k.startsWith(fade.from + '/'));
+        const n = bass.some((k) => k.startsWith(fade.to + '/'));
+        if (o && n) both += 1;
+        if (o) outBass += 1;
+        if (n) inBass += 1;
+      }
+      if (fade && !m.crossfade) fadeEnd = m.audioTime;
+    });
+    const duration = fadeEnd !== null ? fadeEnd - fadeStart : null;
+    const twoBars = 2 * (60 / 174) * 4;
+    results.B10 = { pass: duration !== null && Math.abs(duration - twoBars) <= 0.1 && maxLive <= 2 && both === 0 && outBass > 0 && inBass > 0 &&
+      A().status === 'running' && A().musicPlaying,
+      note: `audio ${A().status}${A().lastError ? ` (${A().lastError})` : ''}, music playing ${A().musicPlaying}; crossfade ${fade ? `${fade.from} → ${fade.to} at bar ${fade.startBar}` : 'not seen'}; lasted ${duration === null ? '?' : duration.toFixed(3)} s on the audio clock (2 bars = ${twoBars.toFixed(3)} s); max live songs ${maxLive}; samples with outgoing bass ${outBass}, incoming bass ${inBass}, both ${both}` };
+  }
+
+  if (mode === 'b12') {
+    // 007 B12: (a) songs keep advancing while muted; (b) a hidden tab mid-crossfade does not replay it.
+    await load('/index.html?seed=7&levelSeconds=3');
+    await clickStart();
+    await until(() => A().status === 'running', 2000, 'running');
+    const notes = [];
+    let pass = true;
+    const expect = (cond, text) => { notes.push(`${cond ? 'ok' : 'FAIL'} ${text}`); pass &&= !!cond; };
+    press('KeyM');
+    await until(() => A().muted, 1000, 'muted');
+    let mutedPlaying = true;
+    await play(30000, () => {
+      if (!A().musicPlaying) mutedPlaying = false;
+      if (G().run.difficultyLevel >= 6 && A().music.stage === 2) throw new Error('done');
+    }).catch(() => {});
+    await until(() => G().run.difficultyLevel >= 6 && A().music.stage === 2, 15000, 'level 6 stage 2').catch(() => {});
+    const startsMuted = A().music.songStarts;
+    expect(A().muted && mutedPlaying, 'sequencer kept running while muted');
+    expect(startsMuted.length >= 2 && startsMuted[1].level === 5 && A().music.stage === 2,
+      `while muted the song changed at level ${startsMuted[1]?.level} and stage is ${A().music.stage} at level ${G().run.difficultyLevel}`);
+    press('KeyM');
+    await until(() => !A().muted, 1000, 'unmuted');
+    // (b) wait for the next crossfade (level 9), then hide and show the page in the middle of it.
+    await play(30000, () => { if (A().music.crossfade && A().music.songStarts.length >= 3) throw new Error('fading'); }).catch(() => {});
+    expect(A().music.crossfade !== null, `in a crossfade (${JSON.stringify(A().music.crossfade)})`);
+    W().dispatchEvent(new (W().PageTransitionEvent)('pagehide', { persisted: true }));
+    await until(() => A().status === 'suspended', 2000, 'suspended').catch(() => {});
+    expect(A().status === 'suspended', `hidden → ${A().status}`);
+    await sleep(600);
+    W().dispatchEvent(new (W().PageTransitionEvent)('pageshow', { persisted: true }));
+    await until(() => A().status === 'running', 2000, 'resumed').catch(() => {});
+    const t0 = A().music.audioTime;
+    await until(() => A().music.liveSongs.length === 1, 4000, 'one song').catch(() => {});
+    const after = A().music;
+    const ids = after.songStarts.map((x) => x.songId);
+    expect(after.liveSongs.length === 1 && after.audioTime - t0 <= 2 * after.barSeconds + 0.3,
+      `one live song ${(after.audioTime - t0).toFixed(2)} s after returning`);
+    expect(new Set(ids).size === ids.length && ids.length === 3, `no song recorded twice (${ids.join(',')})`);
+    results.B12 = { pass, note: notes.join('; ') };
+  }
+
+  if (mode === 'b11') {
+    // 007 B11 (research M15): render 16 bars of each song's stage-4 arrangement offline and measure
+    // (a) the 150 Hz–1 kHz bass band against the sub band (< 100 Hz) for 'speakers' songs and
+    // (b) overall loudness (RMS) against the median song.
+    const data = JSON.parse(await (await fetch('/data/audio.json')).text());
+    const bars = 16;
+    const seconds = bars * 4 * 60 / data.music.bpm + 0.5;
+    const rate = 44100;
+    const rms = (buf) => { const d = buf.getChannelData(0); let sum = 0; for (let i = 0; i < d.length; i++) sum += d[i] * d[i]; return Math.sqrt(sum / d.length); };
+    const db = (x) => 20 * Math.log10(Math.max(x, 1e-9));
+    async function render(songId, outputFilters, onlyRoles = null) {
+      const context = new OfflineAudioContext(1, Math.ceil(seconds * rate), rate);
+      const a = createAudio(data, { muted: false, musicVolume: 100, effectsVolume: 0 }, { context, outputFilters });
+      await a.start();
+      return rms(await a.renderOffline(songId, 4, bars, onlyRoles));
+    }
+    const rows = [];
+    for (const song of data.music.songs) {
+      const full = await render(song.id, []);
+      // Bass parts only, so drums and chords do not count as "bass you can hear".
+      const subBand = await render(song.id, [{ type: 'lowpass', hz: 100 }, { type: 'lowpass', hz: 100 }], ['bass']);
+      const upperBand = await render(song.id, [{ type: 'highpass', hz: 150 }, { type: 'highpass', hz: 150 }, { type: 'lowpass', hz: 1000 }, { type: 'lowpass', hz: 1000 }], ['bass']);
+      rows.push({ id: song.id, speakers: song.bassAudibility === 'speakers', loud: db(full), upperVsSub: db(upperBand) - db(subBand) });
+    }
+    const sorted = rows.map((r) => r.loud).sort((x, y) => x - y);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const audibleOk = rows.filter((r) => r.speakers).every((r) => r.upperVsSub >= -20);
+    const loudOk = rows.every((r) => Math.abs(r.loud - median) <= 3);
+    results.B11 = { pass: rows.length === 5 && audibleOk && loudOk,
+      note: rows.map((r) => `${r.id}${r.speakers ? ' (speakers)' : ''}: loudness ${r.loud.toFixed(1)} dBFS (${(r.loud - median >= 0 ? '+' : '') + (r.loud - median).toFixed(1)} vs median), bass 150 Hz–1 kHz ${r.upperVsSub.toFixed(1)} dB vs its sub`).join('; ') };
+  }
+
+  if (mode === 'preview') {
+    // The listening page (T038, tests/music-preview.html) drives the real synth: song, stage, jump, crossfade, incident.
+    frame.src = '/tests/music-preview.html';
+    await until(() => doc()?.getElementById('start') && W().__musicPreview && doc().querySelectorAll('#songs button').length === 5, 10000, 'preview page');
+    const P = () => W().__musicPreview.stats();
+    const notes = [];
+    let pass = true;
+    const expect = (cond, text) => { notes.push(`${cond ? 'ok' : 'FAIL'} ${text}`); pass &&= !!cond; };
+    doc().getElementById('start').click();
+    await until(() => P().status === 'running' && P().musicPlaying, 3000, 'playing').catch(() => {});
+    expect(P().status === 'running' && P().music.stage === 4, `Start plays song ${P().music.songId} at stage ${P().music.stage}`);
+    const songBtn = doc().querySelectorAll('#songs button')[3];
+    songBtn.click();
+    await until(() => P().music.songId === songBtn.dataset.value, 2000, 'song').catch(() => {});
+    expect(P().music.songId === songBtn.dataset.value && songBtn.getAttribute('aria-pressed') === 'true', `song button → ${P().music.songId}`);
+    doc().querySelectorAll('#stages button')[0].click();
+    await until(() => P().music.stage === 1, 3000, 'stage 1').catch(() => {});
+    expect(P().music.stage === 1, `stage button → stage ${P().music.stage}`);
+    doc().getElementById('jump').click();
+    await until(() => P().music.cycleBar === 25, 3000, 'bar 25').catch(() => {});
+    expect(P().music.cycleBar === 25, `jump → cycle bar ${P().music.cycleBar}`);
+    await until(() => P().music.cycleBar === 29, 8000, 'breakdown').catch(() => {});
+    const drums = P().music.activeParts.filter((k) => /\/(kick|snare|clap|hat)$/.test(k));
+    expect(P().music.cycleBar === 29 && drums.length === 0, `breakdown at bar 29 with drums ${JSON.stringify(drums)}`);
+    doc().getElementById('incident').click();
+    await until(() => P().incidentMusic, 3000, 'incident').catch(() => {});
+    expect(P().incidentMusic && doc().getElementById('incident').getAttribute('aria-pressed') === 'true', 'incident toggle → incident layer on');
+    const before = P().music.songId;
+    doc().getElementById('next').click();
+    await until(() => P().music.crossfade, 3000, 'crossfade').catch(() => {});
+    expect(P().music.crossfade && P().music.crossfade.from === before, `next → crossfade ${JSON.stringify(P().music.crossfade)}`);
+    await until(() => !P().music.crossfade, 5000, 'fade done').catch(() => {});
+    expect(P().music.songId !== before && P().music.liveSongs.length === 1 && P().status === 'running', `after the crossfade: ${P().music.songId}, audio ${P().status}`);
+    expect(doc().getElementById('now-song').textContent !== '—', `read-out shows '${doc().getElementById('now-song').textContent}'`);
+    results.PREVIEW = { pass, note: notes.join('; ') };
   }
 
   if (mode === 'b7') {

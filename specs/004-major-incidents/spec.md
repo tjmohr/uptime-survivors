@@ -227,7 +227,8 @@ the existing features.
 **Sound**
 
 - **FR-017**: Incident arrival MUST play a distinct alarm, resolution MUST play a distinct sound, and
-  the music MUST add an "incident" layer while an incident is active; these sounds are added to the
+  the music MUST add an "incident" layer while an incident is active *(feature 007: now one incident part
+  per song, in that song's key — see [007 FR-012](../007-drum-and-bass-music/spec.md))*; these sounds are added to the
   sound data and validated with it (feature 002).
 
 ### Non-Goals
