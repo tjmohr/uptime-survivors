@@ -70,11 +70,20 @@ html, body {
 }
 
 /* ---------- Banner ---------- */
-.banner {
+.notices {
   position: fixed;
-  top: 22%;
+  top: max(22%, calc(var(--hud-bottom, 0px) + 10px));
   left: 50%;
   transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.banner {
   padding: 8px 18px;
   border: 1px solid var(--accent);
   background: var(--panel);
@@ -412,17 +421,13 @@ body.touch .guide-tabs [role=tab], body.touch #guide-back { min-height: 44px; mi
 /* Major Incident alerts (feature 006): one line per active incident, pulsing red until resolved;
    green "RESOLVED" for 3 s afterwards. Below the regular banner spot. */
 .incident-alerts {
-  position: fixed;
-  top: max(calc(22% + 48px), calc(var(--hud-bottom, 0px) + 10px));
-  left: 50%;
-  transform: translateX(-50%);
   display: grid;
   gap: 6px;
   justify-items: center;
   pointer-events: none;
-  max-width: calc(100vw - 32px);
   text-align: center;
 }
+.incident-alerts:empty { display: none; }
 .incident-alert {
   padding: 6px 14px;
   background: var(--panel);
@@ -436,5 +441,6 @@ body.touch .guide-tabs [role=tab], body.touch #guide-back { min-height: 44px; mi
 @media (prefers-reduced-motion: reduce) { .incident-alert.active { animation: none; } }
 @media (max-width: 600px), (max-height: 500px) {
   .incident-alert { font-size: 12px; padding: 4px 10px; }
-  .incident-alerts { top: max(calc(22% + 40px), calc(var(--hud-bottom, 0px) + 8px)); gap: 4px; }
+  .incident-alerts { gap: 4px; }
+  .notices { gap: 6px; }
 }

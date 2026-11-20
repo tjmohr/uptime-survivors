@@ -44,8 +44,11 @@
   <div id="joystick" class="joystick" aria-hidden="true"><div class="joystick-knob"></div></div>
   <div id="rotate-hint" class="rotate-hint" aria-hidden="true">Rotate your device for more room</div>
 
-  <div id="banner" class="banner" hidden></div>
-  <div id="incident-alerts" class="incident-alerts" aria-hidden="true"></div>
+  <!-- Banners and standing incident alerts stack in one column so a two-line banner never covers an alert. -->
+  <div class="notices">
+    <div id="banner" class="banner" hidden></div>
+    <div id="incident-alerts" class="incident-alerts" aria-hidden="true"></div>
+  </div>
   <div id="overlay" class="overlay"></div>
   <div id="live" class="visually-hidden" aria-live="polite"></div>
 

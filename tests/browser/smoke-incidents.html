@@ -73,6 +73,17 @@ try {
     await sleep(200);
     expect(!G().render.pointers.some((p) => p.kind === 'incident'), 'no pointer once on screen');
     expect(G().audio.incidentMusic === true || G().audio.status !== 'running', `incident music layer on (${G().audio.incidentMusic})`);
+    // A long two-line banner shown at the same time never covers the alert (found in an Arcade screenshot).
+    const b = doc().getElementById('banner');
+    b.textContent = 'New threat: Broadcast Storm — Layer 2 broadcast storm (switching loop), shown long enough to wrap';
+    b.hidden = false;
+    b.style.maxWidth = '320px'; // force a wrapped (phone-like) banner at desktop width
+    await sleep(50);
+    const br = b.getBoundingClientRect();
+    const ar = alertLine('active').getBoundingClientRect();
+    expect(br.height > 40 && ar.top >= br.bottom, `banner (${br.top.toFixed(0)}–${br.bottom.toFixed(0)}) above the alert (${ar.top.toFixed(0)})`);
+    b.hidden = true;
+    b.style.maxWidth = '';
     await sleep(6000); // well past the old 2.6 s banner time
     expect(alertText() === 'MAJOR INCIDENT — Route Leak — BGP route leak' && incident('route-leak'), 'alert still up while the incident is active (6 s later)');
     results.B1 = { pass, note: notes.join('; ') };
